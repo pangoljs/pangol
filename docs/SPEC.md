@@ -144,11 +144,11 @@ export default route({
 | option | จำเป็น | ความหมาย |
 | --- | --- | --- |
 | `auth` | เสมอ | ใครเรียกได้ (ตารางถัดไป) |
-| `response` | เสมอ | schema ของสิ่งที่ส่งออก; field นอก schema ถูกตัดทิ้ง; `t.empty()` คู่กับ `c.noContent()` |
+| `response` | เสมอ | schema ของสิ่งที่ส่งออก; field นอก schema ถูกตัดทิ้ง; `t.empty()` คู่กับ `c.noContent()`; ตัว response เองเป็น `.optional()` ไม่ได้ (type error) |
 | `handler` | เสมอ | `(c) => value` หรือ async |
-| `params` | ไม่บังคับ | ไม่ประกาศ = string 1–200 ตัวที่ผ่าน `safeSegment`; ประกาศแล้วชื่อต้องตรงกับชื่อไฟล์ |
-| `query` | เมื่อ handler อ่าน `c.query` | key ซ้ำ = 400; แปลงเป็นตัวเลข/boolean ตาม schema |
-| `body` | เมื่อ handler อ่าน `c.body` | POST/PUT/PATCH เท่านั้น; JSON หรือ `t.multipart` |
+| `params` | ไม่บังคับ | ไม่ประกาศ = string 1–200 ตัวที่ผ่าน `safeSegment`; ประกาศแล้วต้องเป็น `t.object` และชื่อต้องตรงกับชื่อไฟล์ |
+| `query` | เมื่อ handler อ่าน `c.query` | `t.object`; key ซ้ำ = 400; แปลงเป็นตัวเลข/boolean ตาม schema |
+| `body` | เมื่อ handler อ่าน `c.body` | POST/PUT/PATCH เท่านั้น; `t.object` (JSON) หรือ `t.multipart` |
 | `load` | เมื่อมี owner function | ดึง record ก่อน handler (หัวข้อ 7) |
 | `owner` | เมื่อมี path param และไม่ใช่ public | function, `'none'` หรือ `'query'` |
 | `rateLimit` | ไม่บังคับ | `'10/min'` ต่อ IP + user; store ในหน่วยความจำ (v0.1) |
@@ -163,11 +163,11 @@ export default route({
 | `'public'` | ทุกคน header Authorization ถูกเมิน | `null` เสมอ (อ่าน `c.user` = build error) |
 | `'optional'` | ทุกคน; ส่ง token มาต้องถูก มิฉะนั้น 401 | user หรือ `null` |
 | `'user'` | คนที่ login (มิฉะนั้น 401) | user |
-| `{ permission: 'x' }` | user ที่มี permission (มิฉะนั้น 403) | user |
+| `{ permission: 'x' }` | user ที่มี permission (มิฉะนั้น 403); ชื่อว่างไม่ได้ | user |
 
 **Context `c`:** `c.params`, `c.query`, `c.body` (validate แล้ว มีเฉพาะ field ที่ประกาศ), `c.user`, `c.resource`, `c.ip`, `c.headers` (read-only)
 
-**ผลลัพธ์ของ handler:** คืน value = 200 · `c.created(v)` = 201 · `c.noContent()` = 204 · `c.fail(status, message)` = status พร้อม `{ error }` · throw = 500 (รายละเอียดอยู่ใน log เท่านั้น)
+**ผลลัพธ์ของ handler:** คืน value = 200 · `c.created(v)` = 201 · `c.noContent()` = 204 · `c.fail(status, message)` = status พร้อม `{ error }` (4xx ที่ลงทะเบียนเท่านั้น: 2xx จะข้ามการกรอง response และ 5xx ต้องมาจาก throw) · throw = 500 (รายละเอียดอยู่ใน log เท่านั้น)
 
 **Type:** `route()` ต้อง infer type ของ `c.params`, `c.query`, `c.body`, `c.resource` (จากค่าที่ `load` คืน) และ `c.user` (จาก `defineAuth`, เป็น `null` ได้เมื่อ `'optional'`) และตรวจว่าค่าที่ handler คืนตรงกับ `response` โดยไม่ instantiate type ของทั้งแอป
 

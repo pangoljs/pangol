@@ -95,6 +95,30 @@ route({ auth: 'public', response: t.string(), load: () => ({ id: 'p1' }),
   // @ts-expect-error public routes cannot have an owner function
   owner: () => true, handler: () => 'ok' })
 
+// c.fail is for client errors only: success codes would skip response filtering, and a 5xx
+// should be a thrown error (logged server-side, generic body).
+route({ auth: 'user', response: t.string(), handler: (c) => {
+  // @ts-expect-error a success status is not a failure
+  c.fail(200, 'ok')
+  // @ts-expect-error 5xx comes from a thrown error
+  c.fail(500, 'boom')
+  return c.fail(409, 'conflict')
+} })
+// @ts-expect-error params must be an object schema
+route({ auth: 'public', params: t.string(), response: t.string(), handler: () => 'ok' })
+// @ts-expect-error query must be an object schema
+route({ auth: 'public', query: t.int(), response: t.string(), handler: () => 'ok' })
+// @ts-expect-error body must be an object schema
+route({ auth: 'user', body: t.array(t.string()), response: t.string(), handler: () => 'ok' })
+// @ts-expect-error a permission name cannot be empty
+route({ auth: { permission: '' }, response: t.string(), handler: () => 'ok' })
+// @ts-expect-error an optional response would send 200 with no body; use t.empty() and c.noContent()
+route({ auth: 'public', response: t.string().optional(), handler: () => 'ok' })
+// @ts-expect-error the same rules apply to routes with load
+route({ auth: { permission: '' }, params: t.object({ id: t.id() }), response: t.string(), load: (c) => ({ id: c.params.id }), handler: () => 'ok' })
+const permission: string = 'edit'
+route({ auth: { permission }, response: t.object({ tag: t.string().optional() }), handler: () => ({}) })
+
 const input = t.object({ name: t.string(), tag: t.string().optional(), active: t.bool().default(true) })
 const valid: Infer<typeof input> = { name: 'Ada', active: true }
 void valid
