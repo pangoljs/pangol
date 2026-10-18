@@ -9,7 +9,8 @@ pnpm test
 pnpm typecheck
 ```
 
-Node 22+ is required. Bun is optional (used for the Bun adapter tests).
+Node 22+ is required to use pangol; working on this repo needs Node 22.13+ for pnpm 11.
+Bun is optional (used for the Bun adapter tests).
 
 ## Rules
 
