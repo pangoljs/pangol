@@ -2,7 +2,8 @@ import type { RegisteredUser } from './auth.js'
 import type { Infer, Schema } from './schema.js'
 
 export type Auth = 'public' | 'optional' | 'user' | { readonly permission: string }
-type InputSchema = Schema<unknown> | undefined
+// params, query and body are always objects: fields are validated, unknown keys dropped.
+type InputSchema = Schema<Readonly<Record<string, unknown>>> | undefined
 type Field<K extends string, S extends InputSchema> = S extends Schema<unknown>
   ? { readonly [P in K]: Infer<S> } : {}
 type AuthContext<A extends Auth> = A extends 'public' ? {}
@@ -16,11 +17,15 @@ export type InputContext<A extends Auth, P extends InputSchema, Q extends InputS
 declare const result: unique symbol
 export interface Created<T> { readonly [result]: 'created'; readonly value: T }
 export interface NoContent { readonly [result]: 'noContent' }
-export interface Failure { readonly [result]: 'failure'; readonly status: number; readonly message: string }
+/** Registered 4xx codes. A 2xx would skip response filtering; a 5xx should be a thrown error. */
+export type FailStatus =
+  | 400 | 401 | 402 | 403 | 404 | 405 | 406 | 407 | 408 | 409 | 410 | 411 | 412 | 413 | 414 | 415
+  | 416 | 417 | 421 | 422 | 423 | 424 | 425 | 426 | 428 | 429 | 431 | 451
+export interface Failure { readonly [result]: 'failure'; readonly status: FailStatus; readonly message: string }
 type ResponseValue<S extends Schema<unknown>> = Infer<S> extends undefined
   ? NoContent | Failure : Infer<S> | Created<Infer<S>> | Failure
 type ResponseHelpers<S extends Schema<unknown>> = {
-  readonly fail: (status: number, message: string) => Failure
+  readonly fail: (status: FailStatus, message: string) => Failure
 } & (Infer<S> extends undefined ? { readonly noContent: () => NoContent }
   : { readonly created: (value: Infer<S>) => Created<Infer<S>> })
 
@@ -42,6 +47,13 @@ export interface RouteDefinition<A extends Auth, P extends InputSchema, Q extend
   readonly description?: string
 }
 
+// Declarations the generics accept but the framework must refuse; the string is the error shown.
+type AuthRule<A> = A extends { readonly permission: '' } ? 'auth.permission must not be empty' : unknown
+type ResponseRule<S extends Schema<unknown>> = undefined extends Infer<S>
+  ? [Infer<S>] extends [undefined] ? unknown : 'response must not be optional: use t.empty() with c.noContent()'
+  : unknown
+type Rules<A extends Auth, S extends Schema<unknown>> = { readonly auth: AuthRule<A>; readonly response: ResponseRule<S> }
+
 /** Declaration only: this does not dispatch requests or execute unvalidated handlers. */
 export function route<
   const A extends Auth,
@@ -52,7 +64,7 @@ export function route<
   B extends InputSchema = undefined,
 >(definition: RouteDefinition<A, P, Q, B, R, S> & {
   readonly load: (context: InputContext<A, P, Q, B>) => R
-} & (A extends 'public' ? { readonly owner?: 'none' | 'query' } : {})): RouteDefinition<A, P, Q, B, R, S>
+} & (A extends 'public' ? { readonly owner?: 'none' | 'query' } : {}) & Rules<A, S>): RouteDefinition<A, P, Q, B, R, S>
 export function route<
   const A extends Auth,
   S extends Schema<unknown>,
@@ -62,7 +74,7 @@ export function route<
 >(definition: Omit<RouteDefinition<A, P, Q, B, never, S>, 'load' | 'owner'> & {
   readonly load?: never
   readonly owner?: 'none' | 'query'
-}): RouteDefinition<A, P, Q, B, never, S>
+} & Rules<A, S>): RouteDefinition<A, P, Q, B, never, S>
 export function route(definition: object): object {
   return Object.freeze({ ...definition })
 }
