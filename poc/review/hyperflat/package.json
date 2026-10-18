@@ -1,0 +1,1 @@
+{ "name": "hyperflat", "version": "0.0.1-poc", "type": "module", "main": "index.mjs", "exports": { ".": "./index.mjs" }, "bin": { "hyperflat": "cli.mjs" } }

@@ -1,0 +1,11 @@
+packages:
+  - packages/*
+overrides:
+  # 4.64.6 was too new for the local minimum-release-age policy when bootstrapping.
+  rollup: 4.64.5
+# esbuild is a development-only dependency of the Vitest toolchain.
+# pnpm 10 uses onlyBuiltDependencies; the local pnpm 11 runner uses allowBuilds.
+onlyBuiltDependencies:
+  - esbuild
+allowBuilds:
+  esbuild: true

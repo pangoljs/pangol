@@ -1,0 +1,10 @@
+{"task":"task01","at":"2026-10-13T23:44:39.972Z","ok":true,"out":"✔ app loaded, 3 route handlers\n  GET    /health\n  GET    /me\n  GET    /me\n"}
+{"task":"task02","at":"2026-10-13T23:44:40.220Z","ok":true,"out":"✔ app loaded, 2 route handlers\n  GET    /users\n  GET    /users\n"}
+{"task":"task03","at":"2026-10-13T23:44:40.485Z","ok":true,"out":"✔ app loaded, 2 route handlers\n  GET    /users/:id\n  GET    /users/:id\n"}
+{"task":"task04","at":"2026-10-13T23:44:40.763Z","ok":true,"out":"✔ app loaded, 2 route handlers\n  POST   /users\n  POST   /users\n"}
+{"task":"task05","at":"2026-10-13T23:44:41.011Z","ok":true,"out":"✔ app loaded, 2 route handlers\n  PATCH  /posts/:id\n  PATCH  /posts/:id\n"}
+{"task":"task06","at":"2026-10-13T23:44:41.263Z","ok":true,"out":"✔ app loaded, 2 route handlers\n  DELETE /posts/:id\n  DELETE /posts/:id\n"}
+{"task":"task07","at":"2026-10-13T23:44:41.501Z","ok":true,"out":"✔ app loaded, 1 route handlers\n  GET    /posts\n"}
+{"task":"task08","at":"2026-10-13T23:44:41.739Z","ok":true,"out":"✔ app loaded, 2 route handlers\n  POST   /orders\n  POST   /orders\n"}
+{"task":"task09","at":"2026-10-13T23:44:41.981Z","ok":true,"out":"✔ app loaded, 2 route handlers\n  GET    /orders/:id\n  GET    /orders/:id\n"}
+{"task":"task10","at":"2026-10-13T23:44:42.222Z","ok":true,"out":"✔ app loaded, 1 route handlers\n  POST   /auth/login\n"}

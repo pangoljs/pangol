@@ -1,0 +1,14 @@
+{
+  "name": "pangol-monorepo",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.18.0",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "pnpm --filter pangol dev",
+    "test": "pnpm -r test",
+    "test:bun": "pnpm -r test:bun",
+    "typecheck": "pnpm -r typecheck",
+    "build": "pnpm -r build"
+  }
+}

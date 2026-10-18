@@ -1,0 +1,11 @@
+{"task":"task01","at":"2026-10-13T23:57:44.185Z","ok":false,"out":"✖ src/routes has no route files.\n  Fix: add a file like src/routes/health.get.js\n\n1 problem(s). Nothing was started.\n"}
+{"task":"task01","at":"2026-10-13T23:58:50.213Z","ok":true,"out":"✔ 2 routes OK\n  GET    /health  [auth: public]\n  GET    /me  [auth: user]\n"}
+{"task":"task02","at":"2026-10-13T23:58:50.482Z","ok":true,"out":"✔ 1 routes OK\n  GET    /users  [auth: permission users:read]\n"}
+{"task":"task03","at":"2026-10-13T23:58:50.770Z","ok":true,"out":"✔ 1 routes OK\n  GET    /users/:id  [auth: permission users:read]\n"}
+{"task":"task04","at":"2026-10-13T23:58:51.130Z","ok":true,"out":"✔ 1 routes OK\n  POST   /users  [auth: permission users:write]\n"}
+{"task":"task05","at":"2026-10-13T23:58:51.414Z","ok":true,"out":"✔ 1 routes OK\n  PATCH  /posts/:id  [auth: user]\n"}
+{"task":"task06","at":"2026-10-13T23:58:51.708Z","ok":true,"out":"✔ 1 routes OK\n  DELETE /posts/:id  [auth: user]\n"}
+{"task":"task07","at":"2026-10-13T23:58:51.988Z","ok":true,"out":"✔ 1 routes OK\n  GET    /posts  [auth: optional]\n"}
+{"task":"task08","at":"2026-10-13T23:58:52.320Z","ok":true,"out":"✔ 1 routes OK\n  POST   /orders  [auth: user]\n"}
+{"task":"task09","at":"2026-10-13T23:58:52.638Z","ok":true,"out":"✔ 1 routes OK\n  GET    /orders/:id  [auth: user]\n"}
+{"task":"task10","at":"2026-10-13T23:58:52.996Z","ok":true,"out":"✔ 1 routes OK\n  POST   /auth/login  [auth: public]\n"}

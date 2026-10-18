@@ -1,0 +1,8 @@
+{
+  "name": "task03",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node ../../../tools/check.mjs hyper"
+  }
+}

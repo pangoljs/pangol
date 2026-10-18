@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.pangol/
+coverage/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+poc/**/results/tmp/
+poc/runtime/servers/go/server

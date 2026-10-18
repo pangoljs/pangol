@@ -1,0 +1,32 @@
+V07 vuln   high      (vuln confirmed)  order accepts userId (order on behalf of others)
+V08 vuln   high      (vuln confirmed)  order accepts price from the client
+V09 vuln   check       order accepts addressId with no ownership check
+V10 vuln   high      (vuln confirmed)  order response adds paymentToken
+V11 vuln   check     (vuln confirmed)  /me adds innocently named "credentials" = passwordHash
+V12 vuln   check     (vuln confirmed)  post list stops hiding other people's drafts
+V13 vuln   check       post list adds ?includeDrafts that shows everyone's drafts
+V14 vuln   check       new PATCH /posts with the post id in the body, no ownership check
+V15 vuln   check       new public GET /users/export listing all users
+V16 vuln   check       rate limit removed from POST /orders
+V17 vuln   high        auth.js accepts any token that looks like t-<number>
+V18 vuln   check       order lookup reads the id from a query param, bypassing load/owner
+R01 vuln   silent    (vuln confirmed)  RT-01 load rewrites the owner field so owner always passes
+R02 vuln   silent    (vuln confirmed)  RT-02 load fetches own post, handler deletes c.params.id
+R03a vuln   silent    (vuln confirmed)  RT-03 brute-force lockout removed from login handler
+R03b vuln   silent    (vuln confirmed)  RT-03 handler creates users with role 'admin'
+R04 vuln   info-only   RT-04 new DELETE /orders/:id with owner () => true
+R05 vuln   info-only   RT-05 new GET /orders/invoice?userId=…
+R06 vuln   check     (vuln confirmed)  RT-06 list wrapped in {items,total} and draft filter removed
+B01 benign silent      error message wording
+B02 benign check       new public GET /version
+B03 benign info-only   new GET /posts/:id with a proper owner rule
+B04 benign check       refactor post list (same behaviour)
+B05 benign info-only   tighten: editing posts requires posts:write
+B06 benign check       post list adds published flag to items
+B07 benign check       rename inside guard helper (same logic)
+B08 benign silent      add rate limit to login
+B09 benign silent      change rounding of order total
+B10 benign info-only   new POST /posts, author taken from c.user
+
+vulnerable PRs: 25 | blocked 0 | 🔴 7 | 🟡 12 | missed 6
+benign PRs:     10 | 🔴 false alarm 0 | 🟡 4 | quiet 6 | blocked 0

@@ -1,0 +1,152 @@
+[
+  {
+    "routes": 100,
+    "codegen_ms": 347,
+    "hono": {
+      "server": {
+        "errors": 0,
+        "inst": 359393,
+        "check": 1.6,
+        "total": 2.43,
+        "memMB": 160
+      },
+      "client": {
+        "errors": 0,
+        "inst": 492132,
+        "check": 2.08,
+        "total": 2.91,
+        "memMB": 182
+      },
+      "ide": {
+        "cold_route": 3051,
+        "warm_route": 2211,
+        "resp_fields": 1643,
+        "diag_edit": 1578,
+        "ok": true
+      }
+    },
+    "ours": {
+      "server": {
+        "errors": 0,
+        "inst": 51922,
+        "check": 0.72,
+        "total": 1.49,
+        "memMB": 91
+      },
+      "client": {
+        "errors": 0,
+        "inst": 2505,
+        "check": 0.26,
+        "total": 0.87,
+        "memMB": 74
+      },
+      "ide": {
+        "cold_route": 882,
+        "warm_route": 93,
+        "resp_fields": 85,
+        "diag_edit": 144,
+        "ok": true
+      }
+    }
+  },
+  {
+    "routes": 500,
+    "codegen_ms": 1487,
+    "hono": {
+      "server": {
+        "errors": 0,
+        "inst": 1438493,
+        "check": 5.77,
+        "total": 6.69,
+        "memMB": 420
+      },
+      "client": {
+        "errors": 0,
+        "inst": 2094572,
+        "check": 8.01,
+        "total": 8.91,
+        "memMB": 399
+      },
+      "ide": {
+        "cold_route": 8756,
+        "warm_route": 8030,
+        "resp_fields": 7416,
+        "diag_edit": 7642,
+        "ok": true
+      }
+    },
+    "ours": {
+      "server": {
+        "errors": 0,
+        "inst": 255282,
+        "check": 2.12,
+        "total": 3.07,
+        "memMB": 164
+      },
+      "client": {
+        "errors": 0,
+        "inst": 9745,
+        "check": 0.41,
+        "total": 1.03,
+        "memMB": 81
+      },
+      "ide": {
+        "cold_route": 1050,
+        "warm_route": 241,
+        "resp_fields": 140,
+        "diag_edit": 326,
+        "ok": true
+      }
+    }
+  },
+  {
+    "routes": 2000,
+    "codegen_ms": 5319,
+    "hono": {
+      "server": {
+        "errors": 0,
+        "inst": 8976368,
+        "check": 29.11,
+        "total": 30.45,
+        "memMB": 1698
+      },
+      "client": {
+        "errors": 0,
+        "inst": 11392247,
+        "check": 47.37,
+        "total": 48.48,
+        "memMB": 2183
+      },
+      "ide": {
+        "cold_route": 49819,
+        "warm_route": 49800,
+        "resp_fields": 47992,
+        "diag_edit": 46421,
+        "ok": true
+      }
+    },
+    "ours": {
+      "server": {
+        "errors": 0,
+        "inst": 1017882,
+        "check": 5.51,
+        "total": 6.97,
+        "memMB": 495
+      },
+      "client": {
+        "errors": 0,
+        "inst": 31795,
+        "check": 0.77,
+        "total": 1.52,
+        "memMB": 123
+      },
+      "ide": {
+        "cold_route": 1534,
+        "warm_route": 532,
+        "resp_fields": 296,
+        "diag_edit": 692,
+        "ok": true
+      }
+    }
+  }
+]

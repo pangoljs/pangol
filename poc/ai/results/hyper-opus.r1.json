@@ -1,0 +1,490 @@
+{
+  "run": "hyper-opus",
+  "kind": "hyper",
+  "func": {
+    "pass": 30,
+    "total": 30
+  },
+  "sec": {
+    "pass": 61,
+    "total": 61
+  },
+  "tasksFullyCorrect": 10,
+  "results": {
+    "task01": [
+      {
+        "kind": "func",
+        "name": "GET /health -> 200 {ok:true}",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "GET /me returns caller",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "/me has exactly id,name,email",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "/me without token -> 401",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "/me with unknown token -> 401",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "/me with malformed Authorization -> 401",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "/me does not leak secrets",
+        "pass": true
+      }
+    ],
+    "task02": [
+      {
+        "kind": "func",
+        "name": "lists all 4 users",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "items have exactly id,name,email",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "?limit=2 returns 2",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no token -> 401",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "without users:read -> 403",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no secrets in list",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "limit=0 -> 400",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "limit=abc -> 400",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "limit=101 -> 400",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "limit=2.5 -> 400",
+        "pass": true
+      }
+    ],
+    "task03": [
+      {
+        "kind": "func",
+        "name": "GET /users/3 -> Carol",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "unknown id -> 404",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no token -> 401",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "without users:read -> 403",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no secrets",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "odd id does not crash (not 5xx/200)",
+        "pass": true
+      }
+    ],
+    "task04": [
+      {
+        "kind": "func",
+        "name": "creates user -> 201",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "duplicate email -> 409",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "mass assignment: role in body ignored",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no token -> 401",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "without users:write -> 403",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "missing email -> 400",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "invalid email -> 400",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "empty name -> 400",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "name 101 chars -> 400",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "name not a string -> 400",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "non-JSON content-type is not accepted",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "malformed JSON -> 4xx",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no secrets in response",
+        "pass": true
+      }
+    ],
+    "task05": [
+      {
+        "kind": "func",
+        "name": "author edits own post",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "moderator edits any post",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "unknown post -> 404",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "IDOR: other user cannot edit",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "mass assignment: authorId ignored",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no token -> 401",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "empty title -> 400",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "title 201 chars -> 400",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "title wrong type -> 400",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "neither field -> 400",
+        "pass": true
+      }
+    ],
+    "task06": [
+      {
+        "kind": "func",
+        "name": "author deletes own post -> 204",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "moderator deletes any -> 204",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "unknown -> 404",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "second delete -> 404",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "IDOR: other user cannot delete",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no token -> 401",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "users:read is not posts:moderate",
+        "pass": true
+      }
+    ],
+    "task07": [
+      {
+        "kind": "func",
+        "name": "anonymous sees published posts",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "items have exactly id,title,authorId",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "author sees own draft",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "?authorId=3",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "other users do not see the draft",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "anonymous ?authorId=2 hides draft",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "invalid token -> 401",
+        "pass": true
+      }
+    ],
+    "task08": [
+      {
+        "kind": "func",
+        "name": "places order -> 201 with total",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "rounds total to 2 decimals",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "out of stock -> 409",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "more than stock -> 409",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "unknown product -> 404",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "client price/total ignored",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no token -> 401",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "quantity 0 -> 400",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "quantity 11 -> 400",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "quantity 1.5 -> 400",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "quantity -3 -> 400",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "quantity \"2\" (string) -> 400",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no paymentToken in response",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "failed order does not take stock",
+        "pass": true
+      }
+    ],
+    "task09": [
+      {
+        "kind": "func",
+        "name": "owner views order",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "unknown order -> 404",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "IDOR: other customer cannot view",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "admin cannot view others order",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no token -> 401",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no paymentToken",
+        "pass": true
+      }
+    ],
+    "task10": [
+      {
+        "kind": "func",
+        "name": "correct login -> token that works",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "email is case-insensitive or exact (either ok), wrong pw -> 401",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "unknown email -> 401, same body as wrong password",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no secrets in response",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "lockout: 6th attempt -> 429 even with right password",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "lockout is per email",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "lockout not bypassed by email case",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "4 failures then success still works",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "missing password -> 400",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "password not a string -> 400",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "invalid email -> 400",
+        "pass": true
+      }
+    ]
+  }
+}

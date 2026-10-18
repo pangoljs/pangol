@@ -1,0 +1,390 @@
+{
+  "run": "b-hyper-opus",
+  "kind": "hyper",
+  "func": {
+    "pass": 21,
+    "total": 21
+  },
+  "sec": {
+    "pass": 50,
+    "total": 50
+  },
+  "tasksFullyCorrect": 10,
+  "results": {
+    "task01": [
+      {
+        "kind": "func",
+        "name": "GET /health -> 2xx",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "GET /me returns Bob",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "/me without token -> 401",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "/me unknown token -> 401",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "/me does not leak password hash",
+        "pass": true
+      }
+    ],
+    "task02": [
+      {
+        "kind": "func",
+        "name": "staff lists users",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "limit=2 -> 2 users",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no token -> 401",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "without users:read -> 403",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no password hashes in list",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "limit=abc handled (not 5xx)",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "limit=-1 rejected or ignored (never drops to n-1)",
+        "pass": true
+      }
+    ],
+    "task03": [
+      {
+        "kind": "func",
+        "name": "staff looks up Carol",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "unknown -> 404",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no token -> 401",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "without users:read -> 403",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no password hash",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "odd id not 5xx",
+        "pass": true
+      }
+    ],
+    "task04": [
+      {
+        "kind": "func",
+        "name": "admin adds a user",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "mass assignment: role/permissions in body ignored",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "mass assignment: passwordHash/id in body ignored",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no token -> 401",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "without users:write -> 403",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "missing email rejected, nothing stored",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "non-string name rejected, nothing stored",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "invalid email rejected",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "duplicate email rejected",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no password hash in response",
+        "pass": true
+      }
+    ],
+    "task05": [
+      {
+        "kind": "func",
+        "name": "author edits own post",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "moderator edits any post",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "IDOR: other user cannot edit (db unchanged)",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no token -> 401",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "cannot change authorId",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "cannot change id",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "non-string title rejected, db unchanged",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "unknown post -> 404",
+        "pass": true
+      }
+    ],
+    "task06": [
+      {
+        "kind": "func",
+        "name": "author deletes own post",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "moderator deletes any",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "IDOR: other user cannot delete",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "users:read is not posts:moderate",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no token -> 401",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "unknown -> 404",
+        "pass": true
+      }
+    ],
+    "task07": [
+      {
+        "kind": "func",
+        "name": "anonymous gets published posts",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "author sees own draft",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "filter by author",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "other users do not see the draft",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "anonymous filter by author hides draft",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "draft text not leaked anywhere",
+        "pass": true
+      }
+    ],
+    "task08": [
+      {
+        "kind": "func",
+        "name": "places order with correct total",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "client price/total ignored",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "cannot order on behalf of someone else",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no token -> 401",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "negative quantity rejected, stock unchanged",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "quantity 0 rejected",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "quantity 11 rejected",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "fractional quantity rejected",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "quantity as huge string rejected",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "out of stock rejected, no order",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no payment token in response",
+        "pass": true
+      }
+    ],
+    "task09": [
+      {
+        "kind": "func",
+        "name": "customer views own order",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "IDOR: other customer cannot view",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no token -> 401",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no payment token in response",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "unknown -> 404",
+        "pass": true
+      }
+    ],
+    "task10": [
+      {
+        "kind": "func",
+        "name": "correct login returns a token that works",
+        "pass": true
+      },
+      {
+        "kind": "func",
+        "name": "wrong password -> 401",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "no password hash in response",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "unknown email and wrong password look the same",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "brute force is stopped within 20 attempts",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "after blocking, correct password still refused for a while",
+        "pass": true
+      },
+      {
+        "kind": "sec",
+        "name": "non-string password rejected (not 2xx/5xx)",
+        "pass": true
+      }
+    ]
+  }
+}

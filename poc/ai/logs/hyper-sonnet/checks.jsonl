@@ -1,0 +1,10 @@
+{"task":"task01","at":"2026-10-13T23:43:29.904Z","ok":true,"out":"✔ 2 routes OK\n  GET    /health  [auth: public]\n  GET    /me  [auth: user]\n"}
+{"task":"task02","at":"2026-10-13T23:43:30.244Z","ok":true,"out":"✔ 1 routes OK\n  GET    /users  [auth: permission users:read]\n"}
+{"task":"task03","at":"2026-10-13T23:43:30.519Z","ok":true,"out":"✔ 1 routes OK\n  GET    /users/:id  [auth: permission users:read]\n"}
+{"task":"task04","at":"2026-10-13T23:43:30.793Z","ok":true,"out":"✔ 1 routes OK\n  POST   /users  [auth: permission users:write]\n"}
+{"task":"task05","at":"2026-10-13T23:43:31.095Z","ok":true,"out":"✔ 1 routes OK\n  PATCH  /posts/:id  [auth: user]\n"}
+{"task":"task06","at":"2026-10-13T23:43:31.377Z","ok":true,"out":"✔ 1 routes OK\n  DELETE /posts/:id  [auth: user]\n"}
+{"task":"task07","at":"2026-10-13T23:43:31.651Z","ok":true,"out":"✔ 1 routes OK\n  GET    /posts  [auth: optional]\n"}
+{"task":"task08","at":"2026-10-13T23:43:31.947Z","ok":true,"out":"✔ 1 routes OK\n  POST   /orders  [auth: user]\n"}
+{"task":"task09","at":"2026-10-13T23:43:32.229Z","ok":true,"out":"✔ 1 routes OK\n  GET    /orders/:id  [auth: user]\n"}
+{"task":"task10","at":"2026-10-13T23:43:32.519Z","ok":true,"out":"✔ 1 routes OK\n  POST   /auth/login  [auth: public]\n"}

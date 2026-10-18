@@ -1,0 +1,26 @@
+{
+  "name": "pangol",
+  "version": "0.0.0",
+  "description": "The TypeScript backend framework you can let AI write. Vulnerabilities become build errors.",
+  "license": "MIT",
+  "type": "module",
+  "repository": { "type": "git", "url": "https://github.com/pangoljs/pangol.git", "directory": "packages/pangol" },
+  "homepage": "https://github.com/pangoljs/pangol",
+  "keywords": ["backend", "framework", "typescript", "security", "api", "ai"],
+  "engines": { "node": ">=20" },
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "files": ["dist"],
+  "sideEffects": false,
+  "scripts": {
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:bun": "PANGOL_TEST_RUNTIME=bun bun --bun ./node_modules/vitest/vitest.mjs run",
+    "typeperf": "bun scripts/type-performance.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

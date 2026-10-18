@@ -1,0 +1,588 @@
+[
+  {
+    "id": "V01",
+    "kind": "vuln",
+    "cls": "IDOR (path)",
+    "what": "order owner rule replaced by none",
+    "outcome": "high",
+    "confirmed": true,
+    "findings": {
+      "high": [
+        "`GET /orders/:id` owner changed `rule` → `none` — **ownership is no longer checked**; any signed-in user can act on every record."
+      ],
+      "check": [],
+      "ok": [],
+      "info": []
+    }
+  },
+  {
+    "id": "V02",
+    "kind": "vuln",
+    "cls": "IDOR (path)",
+    "what": "owner rule only checks the caller is signed in",
+    "outcome": "check",
+    "confirmed": true,
+    "findings": {
+      "high": [],
+      "check": [
+        "`GET /orders/:id` owner rule changed:\n  - before: `(c, order) => order.userId === c.user.id`\n  - after:  `(c, order) => Boolean(c.user && order)`"
+      ],
+      "ok": [],
+      "info": []
+    }
+  },
+  {
+    "id": "V03",
+    "kind": "vuln",
+    "cls": "IDOR (path)",
+    "what": "owner: 'query' claimed, handler does not filter",
+    "outcome": "check",
+    "confirmed": true,
+    "findings": {
+      "high": [],
+      "check": [
+        "`GET /orders/:id` owner changed `rule` → `query` — check the handler's query enforces ownership."
+      ],
+      "ok": [],
+      "info": []
+    }
+  },
+  {
+    "id": "V04",
+    "kind": "vuln",
+    "cls": "IDOR (path)",
+    "what": "shared guard helper weakened (_guards.js)",
+    "outcome": "check",
+    "confirmed": true,
+    "findings": {
+      "high": [],
+      "check": [
+        "`DELETE /posts/:id` owner rule changed:\n  - before: `(c, post) => post.authorId === c.user.id || c.user.permissions.includes('posts:moderate')`\n  - after:  `(c, post) => post.authorId === c.user.id || c.user.permissions.length >= 0`",
+        "`PATCH /posts/:id` owner rule changed:\n  - before: `(c, post) => post.authorId === c.user.id || c.user.permissions.includes('posts:moderate')`\n  - after:  `(c, post) => post.authorId === c.user.id || c.user.permissions.length >= 0`"
+      ],
+      "ok": [],
+      "info": []
+    }
+  },
+  {
+    "id": "V05",
+    "kind": "vuln",
+    "cls": "Auth weakened",
+    "what": "user lookup: permission users:read -> any user",
+    "outcome": "high",
+    "confirmed": true,
+    "findings": {
+      "high": [
+        "`GET /users/:id` auth changed `permission:users:read` → `user` — **weaker**."
+      ],
+      "check": [],
+      "ok": [],
+      "info": []
+    }
+  },
+  {
+    "id": "V06",
+    "kind": "vuln",
+    "cls": "Mass assignment",
+    "what": "create user accepts role",
+    "outcome": "high",
+    "confirmed": true,
+    "findings": {
+      "high": [
+        "`POST /users` now accepts `role` — a privilege field the caller controls (mass assignment risk)."
+      ],
+      "check": [],
+      "ok": [],
+      "info": [
+        "`POST /users` handler logic changed (`src/routes/users/index.post.js`) — business rules are not covered by the manifest; review the code."
+      ]
+    }
+  },
+  {
+    "id": "V07",
+    "kind": "vuln",
+    "cls": "Mass assignment",
+    "what": "order accepts userId (order on behalf of others)",
+    "outcome": "high",
+    "confirmed": true,
+    "findings": {
+      "high": [
+        "`POST /orders` now accepts `userId` — the caller can choose which user/owner the record belongs to. Make sure it is taken from `c.user` instead."
+      ],
+      "check": [],
+      "ok": [],
+      "info": [
+        "`POST /orders` handler logic changed (`src/routes/orders/index.post.js`) — business rules are not covered by the manifest; review the code."
+      ]
+    }
+  },
+  {
+    "id": "V08",
+    "kind": "vuln",
+    "cls": "Mass assignment",
+    "what": "order accepts price from the client",
+    "outcome": "high",
+    "confirmed": true,
+    "findings": {
+      "high": [
+        "`POST /orders` now accepts `price` — a money field the caller controls. Prices and totals should be computed on the server."
+      ],
+      "check": [],
+      "ok": [],
+      "info": [
+        "`POST /orders` handler logic changed (`src/routes/orders/index.post.js`) — business rules are not covered by the manifest; review the code."
+      ]
+    }
+  },
+  {
+    "id": "V09",
+    "kind": "vuln",
+    "cls": "IDOR (body)",
+    "what": "order accepts addressId with no ownership check",
+    "outcome": "check",
+    "confirmed": null,
+    "findings": {
+      "high": [],
+      "check": [
+        "`POST /orders` now accepts `addressId` — refers to another record. Check the handler verifies the caller may use that record."
+      ],
+      "ok": [],
+      "info": []
+    }
+  },
+  {
+    "id": "V10",
+    "kind": "vuln",
+    "cls": "Data exposure",
+    "what": "order response adds paymentToken",
+    "outcome": "high",
+    "confirmed": true,
+    "findings": {
+      "high": [
+        "`GET /orders/:id` response now includes `paymentToken` — **looks like a secret**."
+      ],
+      "check": [],
+      "ok": [],
+      "info": []
+    }
+  },
+  {
+    "id": "V11",
+    "kind": "vuln",
+    "cls": "Data exposure",
+    "what": "/me adds innocently named \"credentials\" = passwordHash",
+    "outcome": "check",
+    "confirmed": true,
+    "findings": {
+      "high": [],
+      "check": [
+        "`GET /me` response now includes `credentials`."
+      ],
+      "ok": [],
+      "info": [
+        "`GET /me` handler logic changed (`src/routes/me.get.js`) — business rules are not covered by the manifest; review the code."
+      ]
+    }
+  },
+  {
+    "id": "V12",
+    "kind": "vuln",
+    "cls": "IDOR (list)",
+    "what": "post list stops hiding other people's drafts",
+    "outcome": "high",
+    "confirmed": true,
+    "findings": {
+      "high": [
+        "`GET /posts` handler no longer references `c.user` — any per-user filtering or checks it did are gone."
+      ],
+      "check": [
+        "`GET /posts` returns a list and its handler changed — check row filtering (who sees which rows)."
+      ],
+      "ok": [],
+      "info": []
+    }
+  },
+  {
+    "id": "V13",
+    "kind": "vuln",
+    "cls": "IDOR (list)",
+    "what": "post list adds ?includeDrafts that shows everyone's drafts",
+    "outcome": "check",
+    "confirmed": null,
+    "findings": {
+      "high": [],
+      "check": [
+        "`GET /posts` returns a list and its handler changed — check row filtering (who sees which rows)."
+      ],
+      "ok": [],
+      "info": []
+    }
+  },
+  {
+    "id": "V14",
+    "kind": "vuln",
+    "cls": "IDOR (body)",
+    "what": "new PATCH /posts with the post id in the body, no ownership check",
+    "outcome": "check",
+    "confirmed": null,
+    "findings": {
+      "high": [],
+      "check": [
+        "`PATCH /posts` accepts body field `id` — refers to another record. Check the handler verifies the caller may use that record."
+      ],
+      "ok": [],
+      "info": []
+    }
+  },
+  {
+    "id": "V15",
+    "kind": "vuln",
+    "cls": "Auth weakened",
+    "what": "new public GET /users/export listing all users",
+    "outcome": "check",
+    "confirmed": null,
+    "findings": {
+      "high": [],
+      "check": [
+        "`GET /users/export` is **public** — anyone can call it without signing in."
+      ],
+      "ok": [],
+      "info": []
+    }
+  },
+  {
+    "id": "V16",
+    "kind": "vuln",
+    "cls": "Abuse protection",
+    "what": "rate limit removed from POST /orders",
+    "outcome": "check",
+    "confirmed": null,
+    "findings": {
+      "high": [],
+      "check": [
+        "`POST /orders` rate limit removed (was `30/min`)."
+      ],
+      "ok": [],
+      "info": []
+    }
+  },
+  {
+    "id": "V17",
+    "kind": "vuln",
+    "cls": "Auth weakened",
+    "what": "auth.js accepts any token that looks like t-<number>",
+    "outcome": "high",
+    "confirmed": null,
+    "findings": {
+      "high": [
+        "Authentication logic changed (`src/auth.js` or a file it imports) — affects **every** non-public route."
+      ],
+      "check": [],
+      "ok": [],
+      "info": []
+    }
+  },
+  {
+    "id": "V18",
+    "kind": "vuln",
+    "cls": "IDOR (path)",
+    "what": "order lookup reads the id from a query param, bypassing load/owner",
+    "outcome": "check",
+    "confirmed": null,
+    "findings": {
+      "high": [],
+      "check": [
+        "`GET /orders/:id` now accepts query `orderId` — refers to another record. Check the handler verifies the caller may use that record."
+      ],
+      "ok": [],
+      "info": [
+        "`GET /orders/:id` handler logic changed (`src/routes/orders/[id].get.js`) — business rules are not covered by the manifest; review the code."
+      ]
+    }
+  },
+  {
+    "id": "R01",
+    "kind": "vuln",
+    "cls": "IDOR (path)",
+    "what": "RT-01 load rewrites the owner field so owner always passes",
+    "outcome": "check",
+    "confirmed": true,
+    "findings": {
+      "high": [],
+      "check": [
+        "`GET /orders/:id` load changed (the record that `owner` checks):\n  - before: `(c) => db.orders.get(c.params.id)`\n  - after:  `(c) => ({ ...db.orders.get(c.params.id), userId: c.user.id })`"
+      ],
+      "ok": [],
+      "info": []
+    }
+  },
+  {
+    "id": "R02",
+    "kind": "vuln",
+    "cls": "IDOR (path)",
+    "what": "RT-02 load fetches own post, handler deletes c.params.id",
+    "outcome": "blocked",
+    "confirmed": null,
+    "findings": {
+      "blocked": "✖ src/routes/posts/[id].delete.js\n  DELETE /posts/:id defines `load` but the handler never uses `c.resource`, so the record checked by `owner` may not be the one the handler acts on.\n    Fix: use c.resource in the handler instead of reading c.params again\n\n1 problem(s). Nothing was started."
+    }
+  },
+  {
+    "id": "R03a",
+    "kind": "vuln",
+    "cls": "Business logic",
+    "what": "RT-03 brute-force lockout removed from login handler",
+    "outcome": "info-only",
+    "confirmed": true,
+    "findings": {
+      "high": [],
+      "check": [],
+      "ok": [],
+      "info": [
+        "`POST /auth/login` handler logic changed (`src/routes/auth/login.post.js`) — business rules are not covered by the manifest; review the code."
+      ]
+    }
+  },
+  {
+    "id": "R03b",
+    "kind": "vuln",
+    "cls": "Business logic",
+    "what": "RT-03 handler creates users with role 'admin'",
+    "outcome": "info-only",
+    "confirmed": true,
+    "findings": {
+      "high": [],
+      "check": [],
+      "ok": [],
+      "info": [
+        "`POST /users` handler logic changed (`src/routes/users/index.post.js`) — business rules are not covered by the manifest; review the code."
+      ]
+    }
+  },
+  {
+    "id": "R04",
+    "kind": "vuln",
+    "cls": "IDOR (path)",
+    "what": "RT-04 new DELETE /orders/:id with owner () => true",
+    "outcome": "blocked",
+    "confirmed": null,
+    "findings": {
+      "blocked": "✖ src/routes/orders/[id].delete.js\n  DELETE /orders/:id defines `load` but the handler never uses `c.resource`, so the record checked by `owner` may not be the one the handler acts on.\n    Fix: use c.resource in the handler instead of reading c.params again\n\n1 problem(s). Nothing was started."
+    }
+  },
+  {
+    "id": "R04b",
+    "kind": "vuln",
+    "cls": "IDOR (path)",
+    "what": "RT-04 variant: owner () => true, handler uses c.resource",
+    "outcome": "high",
+    "confirmed": null,
+    "findings": {
+      "high": [
+        "`DELETE /orders/:id` owner rule never looks at the caller (`c.user`): `(c, order) => order.id !== ''` — it may allow everyone."
+      ],
+      "check": [],
+      "ok": [],
+      "info": []
+    }
+  },
+  {
+    "id": "R05",
+    "kind": "vuln",
+    "cls": "IDOR (query)",
+    "what": "RT-05 new GET /orders/invoice?userId=…",
+    "outcome": "high",
+    "confirmed": null,
+    "findings": {
+      "high": [
+        "`GET /orders/invoice` accepts query `userId` — the caller can choose which user/owner the record belongs to. Make sure it is taken from `c.user` instead."
+      ],
+      "check": [],
+      "ok": [],
+      "info": []
+    }
+  },
+  {
+    "id": "R06",
+    "kind": "vuln",
+    "cls": "IDOR (list)",
+    "what": "RT-06 list wrapped in {items,total} and draft filter removed",
+    "outcome": "high",
+    "confirmed": true,
+    "findings": {
+      "high": [
+        "`GET /posts` handler no longer references `c.user` — any per-user filtering or checks it did are gone."
+      ],
+      "check": [
+        "`GET /posts` response now includes `items[].id`.",
+        "`GET /posts` response now includes `items[].title`.",
+        "`GET /posts` response now includes `items[].authorId`.",
+        "`GET /posts` response now includes `total`.",
+        "`GET /posts` returns a list and its handler changed — check row filtering (who sees which rows)."
+      ],
+      "ok": [],
+      "info": [
+        "`GET /posts` response no longer includes `[].id`, `[].title`, `[].authorId` (may break clients)."
+      ]
+    }
+  },
+  {
+    "id": "B01",
+    "kind": "benign",
+    "cls": "",
+    "what": "error message wording",
+    "outcome": "info-only",
+    "confirmed": null,
+    "findings": {
+      "high": [],
+      "check": [],
+      "ok": [],
+      "info": [
+        "`POST /orders` handler logic changed (`src/routes/orders/index.post.js`) — business rules are not covered by the manifest; review the code."
+      ]
+    }
+  },
+  {
+    "id": "B02",
+    "kind": "benign",
+    "cls": "",
+    "what": "new public GET /version",
+    "outcome": "check",
+    "confirmed": null,
+    "findings": {
+      "high": [],
+      "check": [
+        "`GET /version` is **public** — anyone can call it without signing in."
+      ],
+      "ok": [],
+      "info": []
+    }
+  },
+  {
+    "id": "B03",
+    "kind": "benign",
+    "cls": "",
+    "what": "new GET /posts/:id with a proper owner rule",
+    "outcome": "info-only",
+    "confirmed": null,
+    "findings": {
+      "high": [],
+      "check": [],
+      "ok": [
+        "`GET /posts/:id` added — auth `optional`, owner `(c, post) => post.published || (c.user !== null && post.authorId === c.user.id)`, load `(c) => db.posts.get(c.params.id)`, response [id, title, body, authorId]"
+      ],
+      "info": []
+    }
+  },
+  {
+    "id": "B04",
+    "kind": "benign",
+    "cls": "",
+    "what": "refactor post list (same behaviour)",
+    "outcome": "check",
+    "confirmed": null,
+    "findings": {
+      "high": [],
+      "check": [
+        "`GET /posts` returns a list and its handler changed — check row filtering (who sees which rows)."
+      ],
+      "ok": [],
+      "info": []
+    }
+  },
+  {
+    "id": "B05",
+    "kind": "benign",
+    "cls": "",
+    "what": "tighten: editing posts requires posts:write",
+    "outcome": "info-only",
+    "confirmed": null,
+    "findings": {
+      "high": [],
+      "check": [],
+      "ok": [],
+      "info": [
+        "`PATCH /posts/:id` auth tightened `user` → `permission:posts:write`."
+      ]
+    }
+  },
+  {
+    "id": "B06",
+    "kind": "benign",
+    "cls": "",
+    "what": "post list adds published flag to items",
+    "outcome": "check",
+    "confirmed": null,
+    "findings": {
+      "high": [],
+      "check": [
+        "`GET /posts` response now includes `[].published`."
+      ],
+      "ok": [],
+      "info": []
+    }
+  },
+  {
+    "id": "B07",
+    "kind": "benign",
+    "cls": "",
+    "what": "rename inside guard helper (same logic)",
+    "outcome": "check",
+    "confirmed": null,
+    "findings": {
+      "high": [],
+      "check": [
+        "`DELETE /posts/:id` owner rule changed:\n  - before: `(c, post) => post.authorId === c.user.id || c.user.permissions.includes('posts:moderate')`\n  - after:  `(ctx, post) => post.authorId === ctx.user.id || ctx.user.permissions.includes('posts:moderate')`",
+        "`PATCH /posts/:id` owner rule changed:\n  - before: `(c, post) => post.authorId === c.user.id || c.user.permissions.includes('posts:moderate')`\n  - after:  `(ctx, post) => post.authorId === ctx.user.id || ctx.user.permissions.includes('posts:moderate')`"
+      ],
+      "ok": [],
+      "info": []
+    }
+  },
+  {
+    "id": "B08",
+    "kind": "benign",
+    "cls": "",
+    "what": "add rate limit to login",
+    "outcome": "silent",
+    "confirmed": null,
+    "findings": {
+      "high": [],
+      "check": [],
+      "ok": [],
+      "info": []
+    }
+  },
+  {
+    "id": "B09",
+    "kind": "benign",
+    "cls": "",
+    "what": "change rounding of order total",
+    "outcome": "info-only",
+    "confirmed": null,
+    "findings": {
+      "high": [],
+      "check": [],
+      "ok": [],
+      "info": [
+        "`POST /orders` handler logic changed (`src/routes/orders/index.post.js`) — business rules are not covered by the manifest; review the code."
+      ]
+    }
+  },
+  {
+    "id": "B10",
+    "kind": "benign",
+    "cls": "",
+    "what": "new POST /posts, author taken from c.user",
+    "outcome": "info-only",
+    "confirmed": null,
+    "findings": {
+      "high": [],
+      "check": [],
+      "ok": [
+        "`POST /posts` added — auth `user`, response [id, title, authorId]"
+      ],
+      "info": []
+    }
+  }
+]

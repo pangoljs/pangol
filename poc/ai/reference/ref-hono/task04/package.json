@@ -1,0 +1,8 @@
+{
+  "name": "task04",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node ../../../tools/check.mjs hono"
+  }
+}
