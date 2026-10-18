@@ -49,9 +49,22 @@ describe('route declarations', () => {
   it('copies auth definitions without resolving requests', () => {
     let calls = 0
     const resolve = () => { calls++; return null }
-    const definition = defineAuth({ resolve })
+    const definition = defineAuth({ from: { cookie: 'session' }, resolve })
     expect(calls).toBe(0)
     expect(definition.resolve).toBe(resolve)
     expect(Object.isFrozen(definition)).toBe(true)
+    expect(Object.isFrozen(definition.from)).toBe(true)
+  })
+
+  it('rejects an auth definition the runtime could not use', () => {
+    const resolve = () => null
+    const invalid: unknown[] = [
+      { resolve }, { from: 'header', resolve }, { from: { cookie: '' }, resolve },
+      { from: { cookie: 'a b' }, resolve }, { from: { cookie: 'a;b' }, resolve }, { from: 'bearer' },
+    ]
+    for (const definition of invalid) {
+      expect(() => defineAuth(definition as Parameters<typeof defineAuth>[0]), JSON.stringify(definition)).toThrow(TypeError)
+    }
+    expect(() => defineAuth({ from: { cookie: '__Host-session' }, resolve })).not.toThrow()
   })
 })
