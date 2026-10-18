@@ -7,7 +7,7 @@
   "repository": { "type": "git", "url": "https://github.com/pangoljs/pangol.git", "directory": "packages/pangol" },
   "homepage": "https://github.com/pangoljs/pangol",
   "keywords": ["backend", "framework", "typescript", "security", "api", "ai"],
-  "engines": { "node": ">=20" },
+  "engines": { "node": ">=22" },
   "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
   "files": ["dist"],
   "sideEffects": false,

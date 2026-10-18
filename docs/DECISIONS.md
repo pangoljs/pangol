@@ -11,6 +11,7 @@
 | 2026-10-14 | Owner failure → 404 | Do not reveal that a record exists |
 | 2026-10-14 | Bun first for v0.1; keep core runtime-neutral | User chose Bun as the first implementation and validation target; Node and fetch adapters follow |
 | 2026-10-14 | Wording: "financial-grade ready", not "certified" | Certification depends on the whole system the user builds |
+| 2026-10-18 | Minimum Node.js is **22** (was 20); CI tests 22, 24 and 26 | Node 20 reached end of life on 2026-04-30 and gets no security fixes. Nothing is published yet, so raising the floor breaks no users |
 
 ## Open
 

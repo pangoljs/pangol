@@ -9,7 +9,7 @@ pnpm test
 pnpm typecheck
 ```
 
-Node 20+ is required. Bun is optional (used for the Bun adapter tests).
+Node 22+ is required. Bun is optional (used for the Bun adapter tests).
 
 ## Rules
 

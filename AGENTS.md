@@ -28,6 +28,6 @@ build errors, and every risky change shows up in the PR. Read `docs/SPEC.md` bef
 
 ## Style
 
-- TypeScript strict mode, ESM only, Node 20+.
+- TypeScript strict mode, ESM only, Node 22+.
 - Small pure functions; the hot path (per request) avoids allocation and `async` where it can
   (PoC 2: sync routes without a body were ~30% faster).
