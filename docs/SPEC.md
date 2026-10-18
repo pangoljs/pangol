@@ -263,7 +263,8 @@ Route ที่มี path param และไม่ใช่ `'public'` ต้�
 | Param (Bun) | ค่าที่ decode แล้วห้ามมี `/`, `\`, `.`, `..`, control byte | พบใน Bun 1.4.2 |
 | Content-Type | parse ครั้งเดียวใช้ตัดสินทุกอย่าง; JSON รับเฉพาะ `application/json` (charset utf-8); อื่น = 415 | Fastify CVE-2025-32442, CSRF ผ่าน `text/plain` |
 | JSON | ลึก ≤ 32, key ≤ 256 ต่อ object, item ≤ 10,000, key ซ้ำ = 400, `__proto__`/`constructor`/`prototype` = 400 | prototype pollution, parser differential, DoS |
-| Multipart | parse รอบเดียวด้วย Map, ≤ 100 parts, header ≤ 1 KB, field ≤ 64 KB | Elysia CVE-2026-56669 |
+| Multipart | parse รอบเดียวด้วย Map, ≤ 100 parts, header ≤ 1 KB, field ≤ 64 KB; header ของ part (รวมชื่อไฟล์) อ่านเป็น UTF-8 | Elysia CVE-2026-56669 |
+| UTF-8 | body ที่เป็นข้อความ (JSON, field ของ multipart) decode แบบ fatal: ไบต์ที่ไม่ใช่ UTF-8 = 400 ไม่แทนด้วย U+FFFD; BOM ไม่ถูกตัดทิ้ง จึงเป็น JSON ผิด = 400 | parser differential |
 | Body | ≤ 1 MB (ปรับได้), ตัดทันทีเมื่อเกิน | DoS |
 | Query | key ซ้ำ = 400 | parameter pollution |
 
