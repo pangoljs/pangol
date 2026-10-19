@@ -477,7 +477,7 @@ await api.patch('/posts/:id', { params: { id }, body: { title: 'New' } })
 
 Exit code: 0 ผ่าน · 1 มีปัญหา / เกินเกณฑ์ `--fail-on` · 2 ใช้คำสั่งผิด
 
-สถานะ: `check` (`--manifest`), `routes`, `build` (เขียน `.pangol/routes.ts`), `openapi`, `diff` (ไฟล์, revision, `a..b`; `--format`, `--json`, `--fail-on high|medium`) ใช้ได้แล้ว พร้อม option `--root`, `--routes`, `--auth`; ยังไม่มี `dev`, `serve` และ `npm create pangol`
+สถานะ: `check` (`--manifest`), `routes`, `build` (เขียน `.pangol/routes.ts`), `openapi`, `diff` (ไฟล์, revision, `a..b`; `--format`, `--json`, `--fail-on high|medium`) ใช้ได้แล้ว พร้อม option `--root`, `--routes`, `--auth`; ยังไม่มี `dev`, `serve`; initializer `create-pangol` มี implementation และเทสต์ใน repo แล้ว (สถานะเผยแพร่ npm ต้องตรวจแยกจากสถานะโค้ด)
 
 ## 14. เป้าหมายประสิทธิภาพ
 
@@ -562,3 +562,22 @@ v0.1 เริ่มจาก type inference ของ `route()` ก่อน �
 - การตอบ 404 เมื่อไม่ผ่าน owner ควรเปิดให้เปลี่ยนเป็น 403 ต่อ route ได้หรือไม่
 - Idempotency อยู่ใน core หรือเป็น plugin: เสนอให้เป็น option `idempotent: true` ของ route() ตั้งแต่ v0.1 (สงวนชื่อไว้ก่อน ทำจริงทีหลังได้) เพื่อไม่ให้การเพิ่มภายหลังทำให้ API เดิมพัง ต้องตัดสินว่าเก็บ key ที่ไหน (memory/Redis/DB) และอายุของ key
 - ~~`t.money` ส่งออกทาง JSON เป็น string หรือ integer~~ ตัดสินแล้ว: decimal string (`"12.50"`) ดู DECISIONS.md
+
+
+## 19. งานอนาคตลำดับท้าย: pangol + HTMX
+
+**สถานะ: บันทึกไว้ก่อน ยังไม่ implement และยังไม่กำหนดรุ่นที่จะส่งมอบ** (2026-10-19) ทำความพร้อมของ backend ตาม HANDOFF หัวข้อ 4 ก่อน ไม่เปลี่ยนขอบเขต v0.1 ให้เป็น full-stack framework
+
+เป้าหมายคือให้ route ส่งหน้า HTML หรือ HTML fragment สำหรับ HTMX ได้ โดยไม่ต้องมี frontend framework อีกตัว ปัจจุบัน response ของ pangol เป็น JSON ตาม schema หรือไม่มี body; `t.string()` ไม่ใช่ HTML response
+
+**กรอบการออกแบบที่เสนอ — ต้องตัดสิน API ก่อนเริ่ม**
+- Route ยังคงประกาศ auth, input schemas และ response; owner ไม่ผ่านยังตอบ 404
+- ตรวจและกรองข้อมูลตาม response schema ก่อนส่งให้ renderer; template ต้องไม่ได้รับข้อมูล private ที่ถูกตัดออก และต้องทดสอบการรั่วผ่าน HTML จริง
+- Escape ข้อมูลตามบริบท HTML; การ escape ข้อความอย่างเดียวไม่รับประกันความปลอดภัยของ URL, attribute หรือ script จึงต้องกำหนดบริบทที่รองรับและห้ามบริบทอันตราย
+- HTML ดิบต้องเป็นทางเลือกที่ประกาศชัด และออกแบบให้ security diff แสดงการเปลี่ยนแปลงที่เสี่ยง ไม่เปิดทางคืน arbitrary Response เพื่อข้าม validation
+- รองรับ full page และ fragment พร้อม Content-Type ที่ถูกต้อง โดยคง JSON route เดิมไว้
+- ไม่รวม template engine ขนาดใหญ่, React SSR/hydration หรือ frontend bundler ใน core; core ยังคงไม่มี runtime dependencies
+
+**ประเด็นที่ต้องออกแบบร่วมกัน:** renderer/API และขอบเขต trusted template, browser login/session กับ redirect และ Set-Cookie, form-urlencoded/multipart input, CSRF, CSP และ cache ของ fragment ที่ขึ้นกับผู้ใช้ ยังไม่ถือว่าความสามารถเหล่านี้มีแล้วหรือได้รับอนุมัติ API
+
+**เกณฑ์ก่อนส่งมอบ:** เทสต์ XSS ตามบริบทที่รองรับ, private-field leakage, auth/owner/CSRF สำหรับ fragment, content-type และ adapter conformance รวมทั้ง positive/negative และ mutation tests ของกฎความปลอดภัยใหม่
