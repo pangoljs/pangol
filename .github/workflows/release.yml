@@ -1,10 +1,13 @@
 name: release
-# Publishes packages/pangol to npm when a tag like v0.1.0-alpha.1 is pushed. The tag must match the
+# Stages packages/pangol on npm when a tag like v0.1.0-alpha.1 is pushed. The tag must match the
 # version in packages/pangol/package.json. Prereleases go to their own dist-tag (alpha), never `latest`.
 #
-# Auth: npm trusted publishing (OIDC, no token) once it is set up for this repo on npmjs.com
-# (package settings -> Trusted publishing -> GitHub Actions, workflow release.yml). Until then, an
-# NPM_TOKEN repository secret (an npm automation token) is used if present.
+# Auth: npm trusted publishing (OIDC, no token): pangoljs/pangol, workflow release.yml, environment
+# npm, with "Allow npm publish" and "Allow npm dist-tag" off. This workflow can only stage a version;
+# it goes public when a maintainer approves it with 2FA:
+#   npm stage list pangol
+#   npm stage approve <stage-id>
+# A stolen workflow or repository can therefore not publish a release on its own.
 on:
   push:
     tags: ['v*']
@@ -35,13 +38,12 @@ jobs:
       - run: pnpm test
       - run: pnpm test:bun
       - run: pnpm build
-      - name: Publish with provenance
+      - name: Stage for publishing (a maintainer approves with 2FA)
         working-directory: packages/pangol
-        # The dist-tag is passed explicitly: npm 12 ignores publishConfig.tag, and a prerelease must
-        # never become `latest`. 0.1.0-alpha.1 -> alpha, 0.1.0 -> latest.
+        # The dist-tag is passed explicitly and cannot change once staged: npm 12 ignores
+        # publishConfig.tag, and a prerelease must never become `latest`. 0.1.0-alpha.1 -> alpha.
         run: |
           version=$(node -p "require('./package.json').version")
           case "$version" in *-*) tag="${version#*-}"; tag="${tag%%.*}" ;; *) tag=latest ;; esac
-          npm publish --provenance --tag "$tag"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          npm stage publish --provenance --tag "$tag"
+          echo "Staged pangol@$version (tag $tag). Approve it: npm stage list pangol && npm stage approve <stage-id>" >> "$GITHUB_STEP_SUMMARY"
