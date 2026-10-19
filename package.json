@@ -6,9 +6,9 @@
   "engines": { "node": ">=22" },
   "scripts": {
     "dev": "pnpm --filter pangol dev",
-    "test": "pnpm --filter pangol build && pnpm -r test",
-    "test:bun": "pnpm -r test:bun",
-    "typecheck": "pnpm --filter pangol build && pnpm -r typecheck",
-    "build": "pnpm -r build"
+    "test": "pnpm --filter pangol build && node scripts/link-bin.mjs && pnpm -r test",
+    "test:bun": "pnpm --filter pangol build && node scripts/link-bin.mjs && pnpm -r test:bun",
+    "typecheck": "pnpm --filter pangol build && node scripts/link-bin.mjs && pnpm -r typecheck",
+    "build": "pnpm --filter pangol build && node scripts/link-bin.mjs && pnpm -r build"
   }
 }
