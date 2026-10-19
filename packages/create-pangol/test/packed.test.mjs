@@ -5,6 +5,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writ
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { stripVTControlCharacters } from 'node:util'
 
 const pkg = fileURLToPath(new URL('..', import.meta.url))
 const framework = join(pkg, '../pangol')
@@ -13,7 +14,7 @@ const framework = join(pkg, '../pangol')
 // test from prepublishOnly) must not reach the npm commands below: `npm pack` would write nothing.
 const childEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^npm_config_/i.test(key)))
 delete childEnv.NODE_TEST_CONTEXT
-const command = (file, args, cwd) => execFileSync(file, args, { cwd, env: childEnv, encoding: 'utf8', timeout: 90_000, stdio: ['ignore', 'pipe', 'pipe'] })
+const command = (file, args, cwd, env = childEnv) => execFileSync(file, args, { cwd, env, encoding: 'utf8', timeout: 90_000, stdio: ['ignore', 'pipe', 'pipe'] })
 
 test('packed initializer creates projects that check, test, build and serve on Node and Bun', { timeout: 180_000 }, async () => {
   const root = mkdtempSync(join(tmpdir(), 'create-pangol-packed-'))
@@ -39,12 +40,12 @@ test('packed initializer creates projects that check, test, build and serve on N
     symlinkSync(join(framework, 'node_modules/typescript/bin/tsc'), join(modules, '.bin/tsc'))
     const expectRegression = (project, title) => {
       let failure
-      try { command('npm', ['test'], project) } catch (error) { failure = error }
+      // Exercise Bun's colored reporter too: it uses ✗ instead of the plain (fail) label.
+      try { command('npm', ['test'], project, { ...childEnv, FORCE_COLOR: '1' }) } catch (error) { failure = error }
       assert.ok(failure, `mutation must fail: ${title}`)
       assert.equal(failure.status, 1)
-      const output = `${failure.stdout}\n${failure.stderr}`
-      assert.match(output, /not ok|\(fail\)/, output)
-      assert.ok(output.includes(title), output)
+      const output = stripVTControlCharacters(`${failure.stdout}\n${failure.stderr}`)
+      assert.ok(output.split('\n').some(line => /^(?:not ok \d+ - |\(fail\) |✗ )/.test(line) && line.includes(title)), output)
     }
     const coreVersion = JSON.parse(readFileSync(join(framework, 'package.json'), 'utf8')).version
     for (const runtime of ['node', 'bun']) {
