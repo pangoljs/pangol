@@ -62,23 +62,26 @@ test('packed initializer creates projects that check, test, build and serve on N
       symlinkSync(modules, join(project, 'node_modules'), 'dir')
       for (const script of ['check', 'test', 'build']) command('npm', ['run', script], project)
       // Exercise the selected adapter over HTTP; do not bind a fixed port in parallel CI jobs.
-      writeFileSync(join(project, 'smoke.ts'), `import { serve } from 'pangol/${runtime}'\nimport { app } from './src/app.js'\nconst server = serve(app, { hostname: '127.0.0.1', port: 0 })\nconsole.log('PORT', ${runtime === 'node' ? "(server.address() as { port: number }).port" : 'server.port'})\n`)
+      writeFileSync(join(project, 'smoke.ts'), `import { serve } from 'pangol/${runtime}'\nimport { app } from './src/app.js'\nconst server = serve(app, { hostname: '127.0.0.1', port: 0 })\nconsole.log('PORT ' + ${runtime === 'node' ? "(server.address() as { port: number }).port" : 'server.port'})\n`)
       // Node's listen is asynchronous: emit the port from its listening event.
-      if (runtime === 'node') writeFileSync(join(project, 'smoke.ts'), readFileSync(join(project, 'smoke.ts'), 'utf8').replace("console.log('PORT', (server.address() as { port: number }).port)", "server.on('listening', () => console.log('PORT', (server.address() as { port: number }).port))"))
-      const child = spawn(runtime === 'node' ? process.execPath : 'bun', runtime === 'node' ? ['--import', 'pangol/register', 'smoke.ts'] : ['smoke.ts'], { cwd: project, stdio: ['ignore', 'pipe', 'pipe'] })
+      if (runtime === 'node') writeFileSync(join(project, 'smoke.ts'), readFileSync(join(project, 'smoke.ts'), 'utf8').replace("console.log('PORT ' + (server.address() as { port: number }).port)", "server.on('listening', () => console.log('PORT ' + (server.address() as { port: number }).port))"))
+      // A single string keeps the readiness line free of numeric console color escapes.
+      // Force colors so this remains covered even when the parent terminal disables them.
+      const child = spawn(runtime === 'node' ? process.execPath : 'bun', runtime === 'node' ? ['--import', 'pangol/register', 'smoke.ts'] : ['smoke.ts'], { cwd: project, env: { ...childEnv, FORCE_COLOR: '1' }, stdio: ['ignore', 'pipe', 'pipe'] })
+      let stdout = ''
       let stderr = ''
+      const diagnostic = reason => new Error(`${runtime} smoke server ${reason}\nstdout: ${JSON.stringify(stdout)}\nstderr: ${JSON.stringify(stderr)}`)
       child.stderr.on('data', chunk => { stderr += chunk })
       try {
         const port = await new Promise((resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error(`server timeout: ${stderr}`)), 10_000)
-          let stdout = ''
+          const timer = setTimeout(() => reject(diagnostic('did not report a port within 10000ms')), 10_000)
           child.stdout.on('data', chunk => {
             stdout += chunk
             const match = /PORT (\d+)/.exec(stdout)
             if (match) { clearTimeout(timer); resolve(Number(match[1])) }
           })
           child.once('error', error => { clearTimeout(timer); reject(error) })
-          child.once('exit', code => { clearTimeout(timer); reject(new Error(`server exited ${code}: ${stderr}`)) })
+          child.once('exit', (code, signal) => { clearTimeout(timer); reject(diagnostic(`exited (code=${code}, signal=${signal})`)) })
         })
         const res = await fetch(`http://127.0.0.1:${port}/health`)
         assert.equal(res.status, 200)
