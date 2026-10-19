@@ -5,6 +5,7 @@ import type { AuthDefinition, AuthRequest, User } from '../auth.js'
 import { Reject, checkPath, decodeUtf8, isJson, parseJson, pathFromUrl, safeSegment } from '../core/strict.js'
 import { Schema } from '../schema.js'
 import { toDef } from './def.js'
+import { compileCors, type CorsOptions } from './cors.js'
 import { bearerToken, cookieCredential, parseCookies, sameOriginOrAllowed } from './credentials.js'
 import { createLimiter, type Limiter } from './ratelimit.js'
 import { Router, type Method } from './router.js'
@@ -17,8 +18,11 @@ export interface AppOptions {
   readonly auth?: AuthDefinition<User>
   /** `'GET /posts/:id': route({...})`. File-based routing generates this table. */
   readonly routes: Readonly<Record<RouteKey, object>>
-  /** Origins trusted for cross-origin requests (cookie auth). CORS headers are not sent yet. */
-  readonly cors?: { readonly origins: readonly string[] }
+  /**
+   * Browser apps on other origins that may call this API: they get CORS headers, and cookie auth
+   * trusts them for writes (SPEC section 12). Off when left out.
+   */
+  readonly cors?: CorsOptions
   readonly limits?: { readonly body?: number }
   /** Server-side log for 500s; details never reach the client. Default: console.error. */
   readonly log?: (message: string) => void
@@ -37,7 +41,13 @@ export interface App {
 // ---------------------------------------------------------------- responses
 
 export class Out {
-  constructor(readonly status: number, readonly body: string | null, readonly allow?: string) {}
+  constructor(
+    readonly status: number,
+    readonly body: string | null,
+    readonly allow?: string,
+    /** Replaces the default headers (CORS); built at startup, so sending never merges. */
+    readonly headers?: Readonly<Record<string, string>>,
+  ) {}
 }
 const error = (status: number, message: string, field?: string) =>
   new Out(status, JSON.stringify(field === undefined ? { error: message } : { error: message, field }))
@@ -49,10 +59,12 @@ const NO_CONTENT = new Out(204, null)
 
 export const SECURITY_HEADERS = { 'x-content-type-options': 'nosniff', 'x-frame-options': 'DENY', 'cache-control': 'no-store' }
 export const JSON_HEADERS = { ...SECURITY_HEADERS, 'content-type': 'application/json' }
-function toResponse(out: Out): Response {
-  const headers = out.body === null ? SECURITY_HEADERS : out.allow === undefined ? JSON_HEADERS : { ...JSON_HEADERS, allow: out.allow }
-  return new Response(out.body, { status: out.status, headers })
+/** The headers to send with `out`, for every adapter. */
+export function headersOf(out: Out): Readonly<Record<string, string>> {
+  const headers = out.headers ?? (out.body === null ? SECURITY_HEADERS : JSON_HEADERS)
+  return out.allow === undefined ? headers : { ...headers, allow: out.allow }
 }
+const toResponse = (out: Out) => new Response(out.body, { status: out.status, headers: headersOf(out) })
 
 // What c.fail / c.created / c.noContent return. The symbol is private, so a handler cannot forge one.
 const RESULT = Symbol('pangol.result')
@@ -211,9 +223,11 @@ const UNSAFE = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 export function createApp(options: AppOptions): App {
   const { auth, routes, limits = {}, log = (m: string) => console.error(m) } = options
   const bodyLimit = limits.body ?? 1024 * 1024
-  const trusted = new Set(options.cors?.origins ?? [])
   const router = new Router<Compiled>()
   const problems: string[] = []
+  const cors = options.cors === undefined ? undefined
+    : compileCors(options.cors, auth !== undefined && auth.from !== 'bearer', { json: JSON_HEADERS, empty: SECURITY_HEADERS }, problems)
+  const trusted = cors?.origins ?? new Set<string>()
   for (const [key, def] of Object.entries(routes)) {
     const r = compileRoute(key, def as Definition, auth !== undefined, problems)
     if (r !== null && !router.add(r.method, r.path, r.route)) problems.push(`✖ ${key}: the same method and path is defined twice\n    Fix: remove or rename one of them`)
@@ -319,25 +333,40 @@ export function createApp(options: AppOptions): App {
 
   // Steps 1-2 (strict path, routing), then the route's pipeline. `url` is the request-target as the
   // adapter received it: origin-form ("/a?b") from node:http, absolute-form from fetch runtimes.
-  const handle: Handle = (method, url, incoming) => {
+  const dispatch: Handle = (method, url, header, incoming) => {
     const path = pathFromUrl(url)
     if (path === null) return BAD_PATH
     const found = router.find(method, path)
     if (found === null) return NOT_FOUND
-    if ('allow' in found) return new Out(405, METHOD_NOT_ALLOWED, found.allow)
+    if ('allow' in found) {
+      if (cors !== undefined && method === 'OPTIONS' && header('access-control-request-method') !== null) {
+        const headers = cors.preflight(header('origin'), found.allow)
+        return headers === null ? CORS_BLOCKED : new Out(204, null, undefined, headers)
+      }
+      return new Out(405, METHOD_NOT_ALLOWED, found.allow)
+    }
     const q = url.indexOf('?')
     const query = q === -1 ? '' : url.slice(q + 1)
     return run(found.route, incoming(query === '' ? path : `${path}?${query}`, query), found.values)
+  }
+
+  const withCors = (origin: string | null) => (out: Out) =>
+    out.headers !== undefined || cors === undefined ? out : new Out(out.status, out.body, out.allow, cors.response(origin, out.body === null))
+  const handle: Handle = cors === undefined ? dispatch : (method, url, header, incoming) => {
+    const out = dispatch(method, url, header, incoming)
+    const decorate = withCors(header('origin'))
+    return isThenable(out) ? out.then(decorate) : decorate(out)
   }
 
   const app: App = {
     limits: Object.freeze({ body: bodyLimit }),
     fetch(request, info = {}) {
       const url = request.url
-      const out = handle(request.method, url, (target, query) => ({
+      const header = (name: string) => request.headers.get(name)
+      const out = handle(request.method, url, header, (target, query) => ({
         method: request.method, target, query,
         host: request.headers.get('host') ?? new URL(url).host, ip: info.ip ?? '',
-        headers: request.headers, header: (name) => request.headers.get(name), readBody: (limit) => readBody(request, limit),
+        headers: request.headers, header, readBody: (limit) => readBody(request, limit),
       }))
       return isThenable(out) ? out.then(toResponse) : Promise.resolve(toResponse(out))
     },
@@ -346,9 +375,10 @@ export function createApp(options: AppOptions): App {
   return app
 }
 
-export type Handle = (method: string, url: string, incoming: (target: string, query: string) => Incoming) => Out | Promise<Out>
+export type Handle = (method: string, url: string, header: (name: string) => string | null, incoming: (target: string, query: string) => Incoming) => Out | Promise<Out>
 const handlers = new WeakMap<App, Handle>()
 const BAD_PATH = error(400, 'invalid path')
+const CORS_BLOCKED = error(403, 'origin not allowed')
 const METHOD_NOT_ALLOWED = JSON.stringify({ error: 'method not allowed' })
 
 /** For adapters in this package: the app's request handler without the fetch Request/Response wrapping. */

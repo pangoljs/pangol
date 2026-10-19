@@ -70,18 +70,25 @@ const cases: Case[] = [
   ['no content', 'DELETE', '/session', ada],
   ['fail', 'GET', '/conflict'],
   ['handler throws', 'GET', '/boom'],
+  ['CORS: listed origin', 'GET', '/health', { origin: 'https://app.example.com' }],
+  ['CORS: other origin', 'GET', '/health', { origin: 'https://evil.test' }],
+  ['CORS: origin sent twice', 'GET', '/health', { origin: 'https://app.example.com, https://evil.test' }],
+  ['CORS: error to listed origin', 'GET', '/posts/p1', { origin: 'https://app.example.com' }],
+  ['CORS: preflight', 'OPTIONS', '/posts/p1', { origin: 'https://app.example.com', 'access-control-request-method': 'PATCH' }],
+  ['CORS: preflight from other origin', 'OPTIONS', '/posts/p1', { origin: 'https://evil.test', 'access-control-request-method': 'PATCH' }],
+  ['OPTIONS without preflight', 'OPTIONS', '/posts/p1'],
 ]
 
-interface Seen { status: number; body: string; type: string | null; nosniff: string | null; frame: string | null; cache: string | null; allow: string | null }
+const SEEN = ['content-type', 'x-content-type-options', 'x-frame-options', 'cache-control', 'allow', 'vary',
+  'access-control-allow-origin', 'access-control-allow-credentials', 'access-control-allow-methods', 'access-control-allow-headers', 'access-control-max-age']
+interface Seen { status: number; body: string; headers: Record<string, string | null> }
 const viaFetch = async ([, method, path, headers = {}, body]: Case): Promise<Seen> => {
   const res = await app.fetch(new Request('http://127.0.0.1' + path, { method, headers, ...(body !== undefined && { body }) }), { ip: '127.0.0.1' })
-  const h = res.headers
-  return { status: res.status, body: await res.text(), type: h.get('content-type'), nosniff: h.get('x-content-type-options'), frame: h.get('x-frame-options'), cache: h.get('cache-control'), allow: h.get('allow') }
+  return { status: res.status, body: await res.text(), headers: Object.fromEntries(SEEN.map((name) => [name, res.headers.get(name)])) }
 }
 const one = (v: string | string[] | undefined) => (v === undefined ? null : Array.isArray(v) ? v.join(', ') : v)
 const fromRaw = (res: RawResponse): Seen => ({
-  status: res.status, body: res.body, type: one(res.headers['content-type']), nosniff: one(res.headers['x-content-type-options']),
-  frame: one(res.headers['x-frame-options']), cache: one(res.headers['cache-control']), allow: one(res.headers['allow']),
+  status: res.status, body: res.body, headers: Object.fromEntries(SEEN.map((name) => [name, one(res.headers[name])])),
 })
 
 describe(`conformance: fetch adapter vs ${onBun ? 'Bun.serve' : 'node:http'} adapter`, () => {

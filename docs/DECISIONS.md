@@ -19,6 +19,7 @@
 | 2026-10-19 | `money` helpers take a required rounding mode named as in `Intl.NumberFormat` (`halfEven`, `halfExpand`, …); `mul` takes a decimal string factor | No hidden default rounding; the names are a web standard; a float factor would bring back the error `t.money` removes |
 | 2026-10-19 | `t.uuid()` accepts lowercase only; `t.email()` follows the WHATWG `<input type="email">` rule and is not lowercased | One spelling per id (no "A…" vs "a…" duplicates); parsers reject instead of normalizing (SPEC section 8) |
 | 2026-10-19 | `.private()` is checked on responses only (type error + startup check); input may contain private fields. `Model.public()` drops any field that is or contains a private field; `partial()` drops defaults | A body may legitimately carry a secret (a password); a response never may. Dropping the containing field keeps the runtime and the type in agreement. A PATCH default would overwrite stored data |
+| 2026-10-19 | CORS: exact origins only (no `*`, checked at startup); `Allow-Credentials` follows the auth (cookie = on, bearer = off) instead of an option; preflight from an unlisted origin = 403 | A wildcard or a loose match (suffix, case) is the usual CORS hole; tying credentials to the credential source removes a setting that can only be wrong; a 403 shows up in the network tab where a bare 204 would not |
 
 ## Open
 

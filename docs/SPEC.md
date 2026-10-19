@@ -298,7 +298,12 @@ Route ที่มี path param และไม่ใช่ `'public'` ต้�
 
 - `content-type`, `x-content-type-options: nosniff`, `x-frame-options: DENY`, `cache-control: no-store` ทุก response
 - Error เป็น `{ error, field? }` ไม่มี stack trace; 500 log รายละเอียดฝั่ง server เท่านั้น
-- CORS ปิดเป็นค่าเริ่มต้น เปิดด้วย origin ที่ระบุเท่านั้น
+- CORS ปิดเป็นค่าเริ่มต้น เปิดด้วย `cors: { origins, headers?, maxAge? }` เท่านั้น
+  - `origins` ต้องเป็น origin ตรงตัวตามที่ browser ส่ง (`https://app.example.com`: ตัวพิมพ์เล็ก ไม่มี path, `/` ท้าย, port ค่าเริ่มต้น หรือ `*`) ผิดรูป = app ไม่ start; ไม่มี wildcard
+  - origin ที่อยู่ในรายการได้ `Access-Control-Allow-Origin: <origin นั้น>` ทุก response รวม error (ให้ browser อ่าน `{ error }` ได้); origin อื่นไม่ได้ header CORS เลย; เมื่อเปิด CORS ทุก response มี `Vary: Origin`
+  - `Access-Control-Allow-Credentials: true` อัตโนมัติเมื่อ `defineAuth` อ่าน cookie และไม่มีเลยเมื่อเป็น bearer (ไม่มี option `credentials`)
+  - Preflight (`OPTIONS` ที่มี `Access-Control-Request-Method`): path ที่มีอยู่ = 204 พร้อม method ของ path นั้น, `authorization, content-type` + `headers` ที่ประกาศ และ `max-age` (ค่าเริ่มต้น 600 วินาที, ไม่เกิน 86,400); origin ที่ไม่อยู่ในรายการ = 403; path ไม่มี = 404; `OPTIONS` อื่นๆ = 405 เหมือนเดิม
+  - รายการเดียวกันนี้คือ origin ที่ cookie auth เชื่อถือสำหรับการเขียน (หัวข้อ 12)
 - Node: `requestTimeout` 10 s, `headersTimeout` 5 s
 
 **Upload (v0.2)**

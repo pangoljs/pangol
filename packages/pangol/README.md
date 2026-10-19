@@ -7,7 +7,7 @@ Pre-alpha: nothing is published and the API can still change. See the
 
 - `route()` and `t` with full type inference (`c.params`, `c.query`, `c.body`, `c.user`, `c.resource`)
 - `createApp({ auth, routes })`: the request pipeline of SPEC section 3 —
-  strict path check, routing (404/405), auth (401/403, cookie CSRF protection), rate limit (429),
+  strict path check, routing (404/405), CORS for listed origins, auth (401/403, cookie CSRF protection), rate limit (429),
   validation (400/413/415), `load` + `owner` (404), handler, response filtering (500 on mismatch)
 - Adapters: `app.fetch(request)` for any fetch runtime, `serve(app)` from `pangol/bun`, and
   `serve(app)` / `createServer(app)` from `pangol/node` (node:http, no fetch `Request`, raw request-target checks).
@@ -20,7 +20,7 @@ Pre-alpha: nothing is published and the API can still change. See the
   `params` not matching the path, body on GET, unknown option…) refuses to start
 
 Not yet: file-based routing and the `pangol` CLI (`check`, `diff`, `build`),
-CORS headers, `t.multipart`, the typed client and OpenAPI.
+`t.multipart`, the typed client and OpenAPI.
 
 ## Example
 
