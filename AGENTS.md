@@ -8,6 +8,7 @@ build errors, and every risky change shows up in the PR. Read `docs/SPEC.md` bef
 - `packages/pangol/` — the framework (v0.1 in progress). Source in `src/`, tests in `test/`.
 - `docs/SPEC.md` — the specification. Source of truth for behaviour.
 - `docs/DECISIONS.md` — decided and open questions. Do not silently decide an open one; ask.
+- `docs/HANDOFF.md` — current state and the next v0.1 tasks, with the questions to ask before each.
 - `poc/` — finished experiments. **Read-only reference.** They use the old working name
   "hyperflat"; do not rename inside `poc/`.
 
