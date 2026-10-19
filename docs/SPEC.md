@@ -46,9 +46,9 @@ pangol คือ backend framework บน TypeScript ที่ทำให้ท
 - **Core (runtime-neutral):** compiler, กฎ build check, schema และ strict parser ใช้แค่ Web Standards (Web Crypto, Streams, URL) ไม่เรียก API เฉพาะรันไทม์
 - **Adapters:** generate โค้ดที่ใช้ทางที่เร็วที่สุดของแต่ละรันไทม์
   - Bun: `Bun.serve` + native `routes`, ตรวจค่า param ทุกตัวด้วย `safeSegment` (router ของ Bun decode param ให้แล้ว)
-  - Node: `node:http` ตรง ไม่สร้าง `Request` object, dispatcher ที่ generate ไว้, ตรวจ request-target ดิบ
+  - Node: `node:http` ตรง ไม่สร้าง `Request` object, dispatcher ที่ generate ไว้, ตรวจ request-target ดิบ; header ที่ส่งซ้ำ (เช่น `Authorization` สองบรรทัด) ถูกรวมแบบ fetch จึงกลายเป็นค่าที่ผิดรูปแบบ ไม่ใช่ใช้ตัวแรก; body ที่ไม่ได้อ่านจนจบ → ตอบพร้อม `Connection: close`
   - Fetch: `fetch(request)` มาตรฐาน สำหรับเสียบเข้า Next.js/Hono และรันไทม์อื่นในอนาคต
-    - ข้อจำกัด: URL ของ `Request` ถูก parse (WHATWG) และตัด dot-segment ไปแล้วก่อนถึงแอป (`/a/%2E%2E` มาถึงเป็น `/`) adapter นี้จึงปฏิเสธได้เฉพาะรูปแบบที่ยังเห็นได้ ส่วน Node adapter อ่าน request-target ดิบจึงปฏิเสธได้ครบตามหัวข้อ 8
+  - ข้อจำกัดของ Fetch และ Bun: รันไทม์ normalize URL ก่อนถึงแอป — ตัด dot-segment ทั้งแบบตรงและแบบ encode (`/a/%2E%2E/b` มาถึงเป็น `/b`) และ Bun ยุบ `//` ที่ต้น path ด้วย แอปจึงเสิร์ฟ path ที่ normalize แล้ว (ไม่ใช่ path อื่น) แทนการตอบ 400; รูปแบบอื่นในหัวข้อ 8 ยังถูกปฏิเสธ ส่วน Node adapter อ่าน request-target ดิบจึงปฏิเสธได้ครบ conformance test บันทึกความต่างนี้ไว้ทีละกรณี
 - **Tooling:** CLI (`check`, `diff`, `dev`, `build`), codegen ของ typed client และ OpenAPI
 
 **ลำดับต่อ request (คงที่ ทุก adapter ต้องตรงกัน)**

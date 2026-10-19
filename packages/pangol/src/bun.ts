@@ -33,8 +33,9 @@ export function serve(app: App, options: ServeOptions = {}): BunServer {
   return bun.serve({
     port: options.port ?? 3000,
     ...(options.hostname !== undefined && { hostname: options.hostname }),
-    // Bun stops reading past this size before the app sees the request; the app enforces the same limit.
-    maxRequestBodySize: app.limits.body,
+    // The app enforces its own limit and answers 413 with the usual JSON and headers. Bun's limit is a
+    // backstop 1 MiB above it: past that, Bun answers a bare 413 before the app sees the request.
+    maxRequestBodySize: app.limits.body + 1024 * 1024,
     fetch: (request, server) => app.fetch(request, { ip: server.requestIP(request)?.address ?? '' }),
     error: () => new Response(INTERNAL, { status: 500, headers: HEADERS }),
   })
