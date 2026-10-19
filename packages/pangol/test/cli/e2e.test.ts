@@ -130,6 +130,26 @@ export default route({ auth: 'user', params: t.object({ id: t.id() }), response:
     expect(execFileSync('git', ['worktree', 'list'], { cwd: project, encoding: 'utf8' }).trim().split('\n')).toHaveLength(1) // cleaned up
   })
 
+  it('openapi prints the document on stdout, named after package.json', () => {
+    write('package.json', '{ "name": "blog-api", "version": "2.0.0", "type": "module" }')
+    const r = pangol('openapi')
+    expect(r.code).toBe(0)
+    const doc = JSON.parse(r.out)
+    expect(doc).toMatchObject({ openapi: '3.1.0', info: { title: 'blog-api', version: '2.0.0' } })
+    expect(Object.keys(doc.paths)).toEqual(['/health', '/posts/{id}'])
+    expect(doc.paths['/posts/{id}'].get.security).toEqual([{ bearer: [] }])
+  })
+
+  it('openapi refuses a project that fails check', () => {
+    write('src/routes/posts/[id].delete.ts', `import { route, t } from 'pangol'
+export default route({ auth: 'user', params: t.object({ id: t.id() }), response: t.empty(), handler: (c) => c.noContent() })
+`)
+    const r = pangol('openapi')
+    rmSync(join(project, 'src/routes/posts/[id].delete.ts'))
+    expect(r.code).toBe(1)
+    expect(r.out).toBe('')
+  })
+
   it('wrong usage exits 2', () => {
     expect(pangol('chek').code).toBe(2)
     expect(pangol('check', '--rootx', '.').code).toBe(2)

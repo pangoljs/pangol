@@ -9,7 +9,7 @@ export type SchemaDef = Modifiers & (
   | { readonly kind: 'string'; readonly pattern?: RegExp } & Bounded
   | { readonly kind: 'id' | 'uuid' }
   | { readonly kind: 'email'; readonly max: number }
-  | { readonly kind: 'money'; readonly scale: number; readonly min?: bigint; readonly max?: bigint }
+  | { readonly kind: 'money'; readonly scale: number; readonly min?: bigint; readonly max?: bigint; readonly currency?: string }
   | { readonly kind: 'int' | 'number' } & Bounded
   | { readonly kind: 'bool' }
   | { readonly kind: 'empty' }
@@ -47,7 +47,8 @@ export function toDef(schema: unknown): SchemaDef {
     case 'money': {
       const scale = num(o['scale']), min = big(o['min']), max = big(o['max'])
       if (scale === undefined) throw new TypeError('t.money needs a scale')
-      return { ...modifiers, kind: 'money', scale, ...(min !== undefined && { min }), ...(max !== undefined && { max }) }
+      const currency = o['currency']
+      return { ...modifiers, kind: 'money', scale, ...(min !== undefined && { min }), ...(max !== undefined && { max }), ...(typeof currency === 'string' && { currency }) }
     }
     case 'enum': {
       const values = o['values']

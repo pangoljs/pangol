@@ -22,7 +22,7 @@ it('describes what each loaded route exposes', async () => {
   expect(m.auth.file).toBe('src/auth.ts')
   expect(m.auth.from).toBe('bearer')
   expect(Object.keys(m.auth.files)).toEqual(['src/auth.ts'])
-  expect(Object.keys(m.routes)).toEqual(['GET /health', 'GET /posts', 'PATCH /posts/:id', 'POST /posts/:id/publish'])
+  expect(Object.keys(m.routes)).toEqual(['GET /health', 'GET /posts', 'PATCH /posts/:id', 'POST /posts', 'POST /posts/:id/publish'])
 
   const patch = m.routes['PATCH /posts/:id']!
   expect(patch).toMatchObject({

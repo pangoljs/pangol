@@ -30,10 +30,12 @@ Node 22+ (22.18+ to run `.ts` files directly) or Bun.
   applies today, with the file and a fix), `pangol routes`, `pangol build` (writes `.pangol/routes.ts`).
   `node --import pangol/register` runs a TypeScript app on Node 22.18+; Bun runs it as is.
 
+- `pangol openapi`: an OpenAPI 3.1 document whose schemas accept exactly what the validator accepts
+  (money as a decimal string, `x-pangol-*` extensions for what JSON Schema cannot say)
 - The security manifest (`pangol check --manifest m.json`) and `pangol diff main` (or `a..b`, or two
   manifest files): changes sorted 🔴/🟡/✓/ℹ, `--format markdown` for a PR comment, `--fail-on high`.
 
-Not yet: `pangol dev`/`serve`/`openapi`, `npm create pangol`, `t.multipart`, the typed client.
+Not yet: `pangol dev`/`serve`, `npm create pangol`, `t.multipart`, the typed client.
 
 ## Project layout
 
