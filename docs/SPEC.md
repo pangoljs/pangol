@@ -181,11 +181,11 @@ export default route({
 | schema | options | หมายเหตุ |
 | --- | --- | --- |
 | `t.string()` | `min`, `max` (ค่าเริ่มต้น 10,000), `pattern` | ตรวจความยาวก่อน regex เสมอ (กัน ReDoS) |
-| `t.email()` | `max` (254) |  |
+| `t.email()` | `max` (ค่าเริ่มต้นและเพดาน 254) | กฎเดียวกับ `<input type="email">` ของ WHATWG HTML; ส่วนก่อน `@` ไม่เกิน 64 ตัว; ไม่แปลงตัวพิมพ์ (คืนค่าตามที่รับมา) |
 | `t.id()` |  | string 1–200 ผ่าน `safeSegment` |
-| `t.uuid()` |  |  |
+| `t.uuid()` |  | รูป `8-4-4-4-12` ตัวพิมพ์เล็กเท่านั้น (ตัวพิมพ์ใหญ่, `{}`, `urn:uuid:` = 400) ให้ id หนึ่งตัวมีได้แค่การสะกดเดียว |
 | `t.int()` / `t.number()` | `min`, `max` | query/params แปลงจาก string; body ไม่แปลง |
-| `t.money()` | `currency`, `scale` (ค่าเริ่มต้น 2) | v0.1 · รับ/ส่งเป็น decimal string, ภายในเป็นหน่วยย่อยแบบจำนวนเต็ม (bigint) ห้าม float; คำนวณผ่าน helper ที่ปัดเศษแบบระบุชัด |
+| `t.money()` | `currency`, `scale` (ค่าเริ่มต้น 2, 0–18), `min` (ค่าเริ่มต้น `"0"`), `max` | รับ/ส่งเป็น decimal string, ภายในเป็นหน่วยย่อย bigint ห้าม float (รายละเอียดด้านล่าง) |
 | `t.bool()` |  |  |
 | `t.enum([...])` |  |  |
 | `t.array(item)` | `min`, `max` (1,000) |  |
@@ -195,6 +195,27 @@ export default route({
 | `t.pagination()` |  | `page`, `limit` พร้อมขอบเขต |
 
 Modifier: `.optional()`, `.default(v)`, `.private()`
+
+**`t.money`**
+
+- ใน handler เป็น `bigint` หน่วยย่อย (`1250n` = 12.50 ที่ scale 2) บนสายเป็น decimal string (`"12.50"`) ทั้งขาเข้าและขาออก
+- ขาเข้ารับเฉพาะรูปมาตรฐาน: `"12.50"`, `"12.5"`, `"12"` ได้ ส่วน JSON number (แม้ `12`), ทศนิยมเกิน `scale` (`"12.505"`), `"012"`, `"+1"`, `"1e3"`, `"-0"` และ string ยาวเกิน 64 ตัว = 400 ไม่ปัดเศษให้ query/params ใช้กฎเดียวกัน
+- `min` / `max` เป็น decimal string แบบเดียวกับบนสาย (ตัวเลขจะกลายเป็น float = type error) **`min` เป็น `"0"` ถ้าไม่ประกาศ** ยอดติดลบต้องเปิดเอง (`min: '-500.00'`) กันบั๊ก "โอน -100 เพื่อดึงเงิน"
+- `currency` เป็นรหัส ISO 4217 สามตัวพิมพ์ใหญ่ ใช้ในเอกสาร/OpenAPI ไม่ได้เปลี่ยน `scale` (JPY ต้องตั้ง `scale: 0` เอง)
+- ขาออก handler ต้องคืน `bigint` ส่วน number (float) หรือ string = 500 ไม่จัดรูปให้
+- helper `money` (ไม่มีค่าเริ่มต้นของการปัดเศษ ต้องระบุทุกครั้ง ชื่อโหมดตาม `roundingMode` ของ `Intl.NumberFormat`: `ceil`, `floor`, `expand`, `trunc`, `halfCeil`, `halfFloor`, `halfExpand`, `halfTrunc`, `halfEven`)
+
+```ts
+import { money } from 'pangol'
+
+money.parse('12.50')                      // 1250n (scale 2); รูปไม่มาตรฐานหรือทศนิยมเกิน = RangeError
+money.format(1250n)                       // "12.50"
+money.mul(1999n, '0.07', 'halfExpand')    // 140n: ตัวคูณเป็น decimal string เสมอ
+money.div(1000n, 3n, 'halfEven')          // 333n
+money.allocate(100n, [1n, 1n, 1n])        // [34n, 33n, 33n]: ผลรวมเท่ายอดเดิมเสมอ
+```
+
+บวก ลบ และเปรียบเทียบใช้ operator ของ bigint ได้ตรงๆ (`a + b`, `a > b`) เพราะไม่มีเศษให้ปัด
 
 **Model**
 
@@ -214,7 +235,11 @@ User.pick('name').partial()       // สำหรับ PATCH
 User.omit('role')
 ```
 
-- Field ที่เป็น `.private()` ห้ามอยู่ใน `response` (pick ตรงๆ = build error) และถูกปิดใน log อัตโนมัติ (v0.2)
+- `t.model` คือ `t.object` ที่มี helper: validate และ serialize เหมือนกันทุกอย่าง ใช้เป็น field หรือใน `t.array` ได้ และ helper ทุกตัวคืน model ใหม่ (ต่อกันได้ เช่น `pick(...).partial()`)
+- `pick` / `omit` เรียงตามลำดับใน model, ต้องระบุอย่างน้อยหนึ่ง field, ชื่อที่ไม่มีใน model = type error (และ TypeError ตอนประกาศสำหรับ JavaScript)
+- `partial()` ทำทุก field เป็น optional **และตัด `.default()` ทิ้ง** เพราะ field ที่ไม่ส่งมาใน PATCH แปลว่า "ไม่เปลี่ยน" ไม่ใช่ "ใส่ค่าเริ่มต้น"
+- `public()` ตัดทุก field ที่เป็นหรือ**มี** `.private()` อยู่ข้างใน (เช่น `lead: User` หรือ `t.array(User)`) ทิ้งทั้ง field ถ้าต้องการส่วนที่เหลือให้ใช้ `lead: User.public()`
+- Field ที่เป็น `.private()` ห้ามอยู่ใน `response` ไม่ว่าลึกแค่ไหน (ใน object, array, หลัง `.optional()`): type error ที่ `route()` และ app ไม่ยอม start (C10) ส่วนขาเข้า (`body`, `query`) ใช้ได้ และถูกปิดใน log อัตโนมัติ (v0.2)
 - `pangol db pull --from postgres|mysql|sqlite|prisma|drizzle` สร้าง `models.gen.ts` และตั้งชื่อคอลัมน์ `password*`, `*token*`, `*secret*`, `*hash*` เป็น private ให้อัตโนมัติ (v0.2)
 
 **แหล่งความจริงของ model (ล็อกไว้ตั้งแต่ v0.1)**

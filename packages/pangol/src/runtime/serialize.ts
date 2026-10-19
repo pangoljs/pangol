@@ -2,6 +2,7 @@
 // tokens, internal columns) can never leave the server. A value that does not match the schema is
 // an error (-> 500 and a server log), never silently coerced.
 import { toDef, type SchemaDef } from './def.js'
+import { toDecimal } from '../money.js'
 
 /** The handler returned something `response` does not describe. */
 export class ResponseError {
@@ -12,12 +13,19 @@ type Write = (value: unknown) => string
 const fail = (path: string, message: string): never => { throw new ResponseError(path, message) }
 
 function compile(def: SchemaDef, path: string): Write {
+  // SPEC C10: checked once at startup, so no request can ever reach a private field
+  if (def.private) throw new TypeError(`${path} is .private() and can never be sent: use Model.public() or .omit(...) for the response`)
   switch (def.kind) {
-    case 'string': case 'id':
+    case 'string': case 'id': case 'uuid': case 'email':
       return (v) => (typeof v === 'string' ? JSON.stringify(v) : fail(path, 'must be a string'))
     case 'enum': {
       const { values } = def
       return (v) => (typeof v === 'string' && values.includes(v) ? JSON.stringify(v) : fail(path, `must be one of: ${values.join(', ')}`))
+    }
+    case 'money': {
+      const { scale } = def
+      // a number here would already be a float, so it is refused rather than formatted
+      return (v) => (typeof v === 'bigint' ? '"' + toDecimal(v, scale) + '"' : fail(path, 'must be a bigint amount in minor units'))
     }
     case 'int':
       return (v) => (typeof v === 'number' && Number.isSafeInteger(v) ? JSON.stringify(v) : fail(path, 'must be a whole number'))
