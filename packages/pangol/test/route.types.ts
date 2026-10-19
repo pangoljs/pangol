@@ -1,4 +1,4 @@
-import { defineAuth, route, t } from '../src/index.js'
+import { defineAuth, money, route, t } from '../src/index.js'
 import type { Infer } from '../src/index.js'
 
 // Exact equality catches accidental widening to unknown or any.
@@ -143,3 +143,27 @@ void invalid
 t.int().default('20')
 // @ts-expect-error enums must have at least one member
 t.enum([])
+
+// money is bigint minor units inside the server; email and uuid are strings
+exact<Infer<ReturnType<typeof t.money>>, bigint>(true)
+exact<Infer<ReturnType<typeof t.email>>, string>(true)
+exact<Infer<ReturnType<typeof t.uuid>>, string>(true)
+route({
+  auth: 'user',
+  body: t.object({ amount: t.money(), to: t.uuid(), email: t.email().optional() }),
+  response: t.object({ total: t.money() }),
+  handler: (c) => {
+    exact<typeof c.body.amount, bigint>(true)
+    return { total: money.mul(c.body.amount, '1.07', 'halfEven') }
+  },
+})
+// @ts-expect-error a float can never be returned as money
+route({ auth: 'public', response: t.object({ total: t.money() }), handler: () => ({ total: 12.5 }) })
+// @ts-expect-error money defaults are minor units, not floats
+t.money().default(12.5)
+// @ts-expect-error money bounds are decimal strings, not numbers
+t.money({ min: 0 })
+// @ts-expect-error a factor is a decimal string, never a float
+money.mul(100n, 0.07, 'halfEven')
+// @ts-expect-error the rounding mode is required
+money.div(100n, 3n)

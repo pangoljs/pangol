@@ -2,6 +2,7 @@
 // NEW value holding declared fields only, so undeclared input (mass assignment) never reaches a handler.
 import { safeSegment } from '../core/strict.js'
 import { toDef, type SchemaDef } from './def.js'
+import { toDecimal, toMinor } from '../money.js'
 
 /** Expected control flow for bad input (-> 400), so it skips the cost of an Error stack. */
 export class ValidationError {
@@ -16,7 +17,11 @@ const fail = (field: string, message: string): never => { throw new ValidationEr
 // URL values are strings. Only canonical spellings convert: "01", "+1", "1e3", "-0" are refused.
 const INT = /^(?:0|-?[1-9][0-9]*)$/
 const NUMBER = /^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/
-const SCALAR = new Set(['string', 'id', 'int', 'number', 'bool', 'enum'])
+const SCALAR = new Set(['string', 'id', 'uuid', 'email', 'money', 'int', 'number', 'bool', 'enum'])
+// The WHATWG HTML rule for <input type="email">; the length is checked first (labels are at most 63).
+const EMAIL = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
+// Lowercase only: one spelling per id, so "A..." and "a..." can never be two different keys.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 function bounded(field: string, n: number, min: number | undefined, max: number | undefined, unit: string): void {
   if (min !== undefined && n < min) fail(field, `must be at least ${min}${unit}`)
@@ -36,6 +41,24 @@ function compile(def: SchemaDef, field: string, coerce: boolean): Check {
     }
     case 'id':
       return (v) => (typeof v === 'string' && v.length <= 200 && safeSegment(v) ? v : fail(field, 'must be a valid id'))
+    case 'uuid':
+      return (v) => (typeof v === 'string' && UUID.test(v) ? v : fail(field, 'must be a lowercase uuid'))
+    case 'email': {
+      const { max } = def
+      // RFC 5321: at most 64 characters before the "@"
+      return (v) => (typeof v === 'string' && v.length <= max && v.indexOf('@') <= 64 && EMAIL.test(v) ? v : fail(field, 'must be an email address'))
+    }
+    case 'money': {
+      const { scale, min, max } = def
+      const message = scale === 0 ? 'must be a whole amount as a string, such as "12"' : `must be an amount as a string with at most ${scale} decimals, such as "12.50"`
+      return (v) => {
+        const n = typeof v === 'string' ? toMinor(v, scale) : undefined // a JSON number is a float: never accepted
+        if (n === undefined) return fail(field, message)
+        if (min !== undefined && n < min) fail(field, `must be at least ${toDecimal(min, scale)}`)
+        if (max !== undefined && n > max) fail(field, `must be at most ${toDecimal(max, scale)}`)
+        return n
+      }
+    }
     case 'int': case 'number': {
       const { min, max } = def
       const isInt = def.kind === 'int'
@@ -102,7 +125,7 @@ export function compileValidator(schema: unknown, source: Source): (value: unkno
   const coerce = source !== 'body'
   if (coerce) {
     for (const [name, field] of def.fields) {
-      if (!SCALAR.has(field.kind)) throw new TypeError(`${source}.${name}: a URL value is a single string; use a scalar schema (string, id, int, number, bool, enum)`)
+      if (!SCALAR.has(field.kind)) throw new TypeError(`${source}.${name}: a URL value is a single string; use a scalar schema (string, id, uuid, email, money, int, number, bool, enum)`)
     }
   }
   return compile(def, source, coerce)

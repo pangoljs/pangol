@@ -12,11 +12,13 @@ Pre-alpha: nothing is published and the API can still change. See the
 - Adapters: `app.fetch(request)` for any fetch runtime, `serve(app)` from `pangol/bun`, and
   `serve(app)` / `createServer(app)` from `pangol/node` (node:http, no fetch `Request`, raw request-target checks).
   A conformance test sends the same requests through each and compares the answers.
+- `t.money` (bigint minor units inside, decimal string `"12.50"` on the wire, never a float) and
+  the `money` helpers with explicit rounding; `t.email`, `t.uuid`
 - Startup checks: an app with an unsafe or invalid route (missing `owner` on a record route,
   `params` not matching the path, body on GET, unknown option…) refuses to start
 
 Not yet: file-based routing and the `pangol` CLI (`check`, `diff`, `build`),
-CORS headers, `t.money`, `t.model`, `t.email`/`t.uuid`/`t.multipart`, the typed client and OpenAPI.
+CORS headers, `t.model`, `t.multipart`, the typed client and OpenAPI.
 
 ## Example
 

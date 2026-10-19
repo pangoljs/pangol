@@ -7,7 +7,9 @@ interface Bounded { readonly min?: number; readonly max?: number }
 
 export type SchemaDef = Modifiers & (
   | { readonly kind: 'string'; readonly pattern?: RegExp } & Bounded
-  | { readonly kind: 'id' }
+  | { readonly kind: 'id' | 'uuid' }
+  | { readonly kind: 'email'; readonly max: number }
+  | { readonly kind: 'money'; readonly scale: number; readonly min?: bigint; readonly max?: bigint }
   | { readonly kind: 'int' | 'number' } & Bounded
   | { readonly kind: 'bool' }
   | { readonly kind: 'empty' }
@@ -17,6 +19,7 @@ export type SchemaDef = Modifiers & (
 )
 
 const num = (v: unknown) => (typeof v === 'number' ? v : undefined)
+const big = (v: unknown) => (typeof v === 'bigint' ? v : undefined)
 const bounds = (o: Readonly<Record<string, unknown>>): Bounded => {
   const min = num(o['min']), max = num(o['max'])
   return { ...(min !== undefined && { min }), ...(max !== undefined && { max }) }
@@ -32,10 +35,20 @@ export function toDef(schema: unknown): SchemaDef {
       const pattern = o['pattern']
       return { ...modifiers, kind: 'string', ...bounds(o), ...(pattern instanceof RegExp && { pattern }) }
     }
-    case 'id': case 'bool': case 'empty':
+    case 'id': case 'uuid': case 'bool': case 'empty':
       return { ...modifiers, kind: schema.kind }
     case 'int': case 'number':
       return { ...modifiers, kind: schema.kind, ...bounds(o) }
+    case 'email': {
+      const max = num(o['max'])
+      if (max === undefined) throw new TypeError('t.email needs a max length')
+      return { ...modifiers, kind: 'email', max }
+    }
+    case 'money': {
+      const scale = num(o['scale']), min = big(o['min']), max = big(o['max'])
+      if (scale === undefined) throw new TypeError('t.money needs a scale')
+      return { ...modifiers, kind: 'money', scale, ...(min !== undefined && { min }), ...(max !== undefined && { max }) }
+    }
     case 'enum': {
       const values = o['values']
       if (!Array.isArray(values) || !values.every((v) => typeof v === 'string')) throw new TypeError('t.enum needs string values')
