@@ -417,6 +417,15 @@ await api.patch('/posts/:id', { params: { id }, body: { title: 'New' } })
 
 **OpenAPI 3.1:** `pangol openapi > openapi.json` สร้างจาก JSON Schema ชุดเดียวกับ client รวม security requirement ตาม `auth` และ `description` ของ route บน OpenAPI นี้ใช้เครื่องมือที่มีอยู่แล้วได้ เช่น mock server, SDK ภาษาอื่น และตรวจ breaking change
 
+การทำงาน (v0.1):
+- รัน `pangol check` ก่อน มีปัญหา = exit 1 และไม่พิมพ์เอกสาร; `info` มาจาก `name`/`version` ใน `package.json` ของโปรเจกต์
+- **schema บอกตรงกับที่ validator รับ:** `id`, `uuid`, `email` และ `money` ใช้ pattern ชุดเดียวกับ validator (มี property test ยืนยันว่าทั้งสองรับค่าเดียวกัน) สิ่งที่ JSON Schema บอกไม่ได้อยู่ใน extension: `x-pangol-money` (`scale`, `currency`, `minimum`, `maximum` เป็น decimal string) และ `x-pangol-pattern` (regex ที่มี flag)
+- `t.money` เป็น `type: string` ตามสาย; ค่า `default` ของ money เป็น decimal string
+- input: field ที่ไม่ได้ประกาศถูกตัดทิ้ง (ไม่ถูกปฏิเสธ) จึงไม่ใส่ `additionalProperties: false`; field `.private()` เป็น `writeOnly`; output ใส่ `additionalProperties: false` เสมอ
+- response สำเร็จ: `t.empty()` = 204; handler ที่เรียก `c.created` (อ่านจาก AST) = 201; อื่นๆ = 200; error เป็น `#/components/schemas/Error` (`{ error, field? }`) ตามที่ route ตอบได้จริง: 400 และ 500 เสมอ, 401 เมื่อไม่ public, 403 เมื่อมี permission หรือ cookie auth กับ method ที่เขียนข้อมูล, 404 เมื่อมี `load`, 413/415 เมื่อมี body, 429 เมื่อมี `rateLimit` และ status ที่ส่งให้ `c.fail(...)` เป็นตัวเลขตรงๆ
+- `auth`: bearer = `http`/`bearer`, cookie = `apiKey` ใน cookie; `'public'` = `security: []`, `'optional'` = `[{}, {scheme}]`; permission อยู่ใน `x-pangol-permission` และชนิดของ `owner` ใน `x-pangol-owner`
+- ข้อจำกัด: `maxLength` ของ JSON Schema นับ code point ส่วน validator นับ UTF-16 จึงเข้มกว่าเล็กน้อยกับอักขระนอก BMP (เช่น emoji)
+
 ## 12. เสียบเข้าระบบเดิม และถอดออก
 
 ตั้งแต่ v0.1 pangol ต้องเสียบเข้าเป็นโฟลเดอร์ย่อยของแอปเดิมได้ และใช้ ORM, schema และ session เดิมได้ทั้งหมด
@@ -459,9 +468,16 @@ await api.patch('/posts/:id', { params: { id }, body: { title: 'New' } })
 | `pangol migrate generate <name>` | สร้าง SQL up/down จาก model ที่ source = 'framework' ให้คน review | 0.3 |
 | `pangol eject --to hono` | ถอดออก | 0.3 |
 
+**Project initializer (`create-pangol`)**
+- รับ `<dir>` และ `--runtime node|bun`; ถ้าไม่ได้ระบุให้ถามเฉพาะชื่อโฟลเดอร์และ runtime (default Node) ส่วน non-interactive ต้องระบุทั้งสองค่า
+- ไม่ติดตั้ง dependency และไม่เขียนทับไฟล์: ยอมรับเฉพาะโฟลเดอร์ใหม่หรือโฟลเดอร์ว่างที่ไม่ใช่ symlink; ค่าที่ผิดต้องถูกปฏิเสธก่อนเขียนไฟล์
+- Template มี auth ที่ปฏิเสธ credential ทั้งหมดจนกว่าจะต่อระบบจริง, health route สาธารณะ, ตัวอย่าง posts แบบ load + owner, model, เทสต์ auth/owner/response filtering, `AGENTS.md` และ `.gitignore`
+- ระหว่างที่ยังไม่มี `pangol dev/serve` ใช้ `src/server.ts` เรียก adapter ของ runtime ที่เลือก; scripts `dev` ใช้ watcher ของ runtime (เพิ่ม/ลบ route ต้อง restart เพื่อสร้างตารางใหม่), `check`, `build`, `test` ใช้ได้จริง; Node template ต้องใช้ Node 22.18+ ตาม `pangol/register`
+- `create-pangol` แยก version จาก `pangol`; template pin รุ่น framework ที่ผ่านการทดสอบ ไม่ใช้ `latest` หรือช่วง version
+
 Exit code: 0 ผ่าน · 1 มีปัญหา / เกินเกณฑ์ `--fail-on` · 2 ใช้คำสั่งผิด
 
-สถานะ: `check` (`--manifest`), `routes`, `build` (เขียน `.pangol/routes.ts`), `diff` (ไฟล์, revision, `a..b`; `--format`, `--json`, `--fail-on high|medium`) ใช้ได้แล้ว พร้อม option `--root`, `--routes`, `--auth`; ยังไม่มี `dev`, `serve`, `openapi` และ `npm create pangol`
+สถานะ: `check` (`--manifest`), `routes`, `build` (เขียน `.pangol/routes.ts`), `openapi`, `diff` (ไฟล์, revision, `a..b`; `--format`, `--json`, `--fail-on high|medium`) ใช้ได้แล้ว พร้อม option `--root`, `--routes`, `--auth`; ยังไม่มี `dev`, `serve` และ `npm create pangol`
 
 ## 14. เป้าหมายประสิทธิภาพ
 

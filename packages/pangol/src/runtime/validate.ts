@@ -19,9 +19,9 @@ const INT = /^(?:0|-?[1-9][0-9]*)$/
 const NUMBER = /^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/
 const SCALAR = new Set(['string', 'id', 'uuid', 'email', 'money', 'int', 'number', 'bool', 'enum'])
 // The WHATWG HTML rule for <input type="email">; the length is checked first (labels are at most 63).
-const EMAIL = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
+export const EMAIL = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
 // Lowercase only: one spelling per id, so "A..." and "a..." can never be two different keys.
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 function bounded(field: string, n: number, min: number | undefined, max: number | undefined, unit: string): void {
   if (min !== undefined && n < min) fail(field, `must be at least ${min}${unit}`)

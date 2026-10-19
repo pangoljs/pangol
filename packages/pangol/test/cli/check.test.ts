@@ -15,6 +15,7 @@ describe('pangol check', () => {
       ['PATCH /posts/:id', 'src/routes/posts/[id].patch.ts'],
       ['POST /posts/:id/publish', 'src/routes/posts/[id]/publish.post.ts'],
       ['GET /posts', 'src/routes/posts/index.get.ts'],
+      ['POST /posts', 'src/routes/posts/index.post.ts'],
     ])
     expect(result.auth).toBeDefined()
   })

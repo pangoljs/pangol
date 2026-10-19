@@ -45,6 +45,8 @@
 
 ### 3.1 OpenAPI: `pangol openapi`
 
+**สถานะ: เสร็จแล้ว** (branch `feat/openapi`) ดู SPEC 11 "การทำงาน (v0.1)" ข้อที่ยังไม่ได้ทำ: ตรวจเอกสารด้วย validator ทางการของ OpenAPI 3.1 (ต้องเพิ่ม devDependency)
+
 **ทำไมก่อน:** เล็ก ใช้ของที่มีอยู่ (`SchemaDef`, manifest) และเป็นฐานของ typed client (SPEC 11: "จาก JSON Schema ชุดเดียวกับ client")
 
 **SPEC:** 11, 13

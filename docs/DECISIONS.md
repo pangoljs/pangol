@@ -25,6 +25,9 @@
 | 2026-10-19 | `pangol/register` for running TypeScript on Node 22.18+ (type stripping + a `.js`→`.ts` resolve hook), no loader dependency | Node already strips types; only the `./x.js` import habit of TypeScript was missing |
 | 2026-10-19 | `pangol diff <ref>` rebuilds the base manifest in a temporary git worktree that reuses the installed `node_modules`; `--fail-on` takes `high` or `medium` (the SPEC's `check` level was replaced: `pangol check` already fails on its own) | A committed manifest can be edited by the same PR; a level name is clearer than overloading `check` |
 
+| 2026-10-19 | `create-pangol` versions independently; the template pins the tested `pangol` version | User chose independent releases; generator fixes need not release the framework |
+| 2026-10-19 | OpenAPI: 201 is read from the handler's AST (`c.created`), no `status` option on `route()`; input schemas leave `additionalProperties` open (undeclared input is dropped, not refused); what JSON Schema cannot express goes into `x-pangol-*` extensions | Keeps `route()` unchanged and the document truthful: a client reading it must not believe the server refuses what it accepts, or accepts what it refuses |
+
 ## Open
 
 - Idempotency: core (`idempotent: true` on `route()`) or plugin? Where are keys stored, and for how long?

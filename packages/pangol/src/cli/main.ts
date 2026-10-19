@@ -15,6 +15,7 @@ Commands:
   check [--manifest <file>]   check every route in src/routes (SPEC section 9); write the manifest
   routes                      check, then list each route with its auth and owner
   build                       check, then write .pangol/routes.ts for createApp({ routes })
+  openapi                     check, then print an OpenAPI 3.1 document of every route (SPEC section 11)
   diff <base> [<head>]        security changes between two manifests (SPEC section 10):
                                 diff base.json head.json   two manifest files
                                 diff main                  git revision vs the working tree
@@ -47,6 +48,7 @@ const FLAGS: Readonly<Record<string, readonly string[]>> = {
   check: ['--root', '--routes', '--auth', '--manifest'],
   routes: ['--root', '--routes', '--auth'],
   build: ['--root', '--routes', '--auth'],
+  openapi: ['--root', '--routes', '--auth'],
   diff: ['--root', '--routes', '--auth', '--format', '--json', '--fail-on'],
 }
 
@@ -91,6 +93,14 @@ async function loadTypeScript(root: string): Promise<typeof TS> {
       throw new UsageError('pangol check needs the typescript package: npm install -D typescript')
     }
   }
+}
+
+/** Title and version for the OpenAPI document, from the project's package.json. */
+function projectInfo(root: string): { title: string; version: string } {
+  try {
+    const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { name?: unknown; version?: unknown }
+    return { title: typeof pkg.name === 'string' ? pkg.name : 'API', version: typeof pkg.version === 'string' ? pkg.version : '0.0.0' }
+  } catch { return { title: 'API', version: '0.0.0' } }
 }
 
 const authLabel = (a: unknown) => (typeof a === 'object' && a !== null ? `permission:${String((a as { permission?: unknown }).permission)}` : String(a))
@@ -160,7 +170,10 @@ export async function main(argv: readonly string[], out = (s: string) => console
     err(`\n${result.findings.length} problem(s) in ${result.routes.length} route(s).`)
     return 1
   }
-  if (args.command === 'routes') {
+  if (args.command === 'openapi') {
+    const { openApi } = await import('./openapi.js')
+    out(JSON.stringify(openApi(result, ts, projectInfo(args.root)), null, 2))
+  } else if (args.command === 'routes') {
     out(table([['ROUTE', 'AUTH', 'OWNER', 'FILE'], ...result.routes.map((r) => [r.key, authLabel(r.definition['auth']), ownerLabel(r.definition['owner']), r.file])]))
   } else if (args.command === 'build') {
     const { importExtension, writeRoutes } = await import('./build.js')

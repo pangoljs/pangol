@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- `pangol openapi`: OpenAPI 3.1 from the loaded routes. Schemas use the validator's own patterns for
+  id, uuid, email and money (a property test checks they accept the same values); money bounds and
+  regex flags are in `x-pangol-*` extensions; 201 when the handler calls `c.created`, error responses
+  per route (including `c.fail` statuses), security from `defineAuth`.
+
 ## 0.1.0-alpha.0
 
 First public alpha. The API can still change before 0.1.0; see `docs/SPEC.md` for what is planned.
