@@ -20,9 +20,20 @@ export async function transaction<T>(work: (client: PoolClient) => Promise<T>): 
 
 export async function userId(issuer: string, subject: string): Promise<string> {
   // Stable identity is (issuer, subject), never an email/username or a client-supplied ID.
-  const result = await pool.query<{ id: string }>(`INSERT INTO app_users (id, issuer, subject)
-    VALUES ($1, $2, $3) ON CONFLICT (issuer, subject) DO UPDATE SET subject = EXCLUDED.subject RETURNING id`, [randomUUID(), issuer, subject])
-  return result.rows[0]!.id
+  const existing = await pool.query<{ id: string }>(
+    'SELECT id FROM app_users WHERE issuer = $1 AND subject = $2', [issuer, subject])
+  if (existing.rows[0] !== undefined) return existing.rows[0].id
+
+  const inserted = await pool.query<{ id: string }>(`INSERT INTO app_users (id, issuer, subject)
+    VALUES ($1, $2, $3) ON CONFLICT (issuer, subject) DO NOTHING RETURNING id`, [randomUUID(), issuer, subject])
+  if (inserted.rows[0] !== undefined) return inserted.rows[0].id
+
+  // A concurrent first login inserted the row. A separate READ COMMITTED statement sees its
+  // committed ID; combining INSERT and SELECT in one CTE could keep the old, empty snapshot.
+  const winner = await pool.query<{ id: string }>(
+    'SELECT id FROM app_users WHERE issuer = $1 AND subject = $2', [issuer, subject])
+  if (winner.rows[0] === undefined) throw new Error('Identity disappeared during creation; retry the request')
+  return winner.rows[0].id
 }
 
 export interface Post { id: string; title: string; ownerId: string; internalNote: string }

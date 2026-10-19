@@ -22,6 +22,24 @@ test('real Keycloak -> HTTP -> PostgreSQL: CRUD, isolation, permission, filterin
   let server: ReturnType<typeof serve> | undefined
   try {
     await pool.query(await readFile(new URL('../migrations/001-initial.sql', import.meta.url), 'utf8'))
+    // Existing identities must be read-only: an UPDATE changes the tuple's xmin even if values match.
+    const known = await userId(issuer, 'repeat-identity')
+    const before = await pool.query('SELECT xmin::text AS version FROM app_users WHERE id = $1', [known])
+    assert.equal(await userId(issuer, 'repeat-identity'), known)
+    const after = await pool.query('SELECT xmin::text AS version FROM app_users WHERE id = $1', [known])
+    assert.equal(after.rows[0].version, before.rows[0].version, 'existing identity lookup must not write')
+    // Delay insertion so concurrent first lookups all observe an absent identity.
+    await pool.query(`CREATE FUNCTION delay_identity_insert() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN PERFORM pg_sleep(0.05); RETURN NEW; END $$`)
+    await pool.query('CREATE TRIGGER delay_identity_insert BEFORE INSERT ON app_users FOR EACH ROW EXECUTE FUNCTION delay_identity_insert()')
+    try {
+      const ids = await Promise.all(Array.from({ length: 32 }, () => userId(issuer, 'concurrent-identity')))
+      assert.equal(new Set(ids).size, 1, 'concurrent first logins must share one ID')
+      assert.equal((await pool.query('SELECT id FROM app_users WHERE issuer = $1 AND subject = $2', [issuer, 'concurrent-identity'])).rowCount, 1)
+    } finally {
+      await pool.query('DROP TRIGGER delay_identity_insert ON app_users')
+      await pool.query('DROP FUNCTION delay_identity_insert()')
+    }
     const token = async (who: string) => {
       const result = await fetch(`${issuer}/protocol/openid-connect/token`, { method: 'POST',
         body: new URLSearchParams({ grant_type: 'client_credentials', client_id: `test-${who}`, client_secret: `test-only-${who}` }), signal: AbortSignal.timeout(5000) })
