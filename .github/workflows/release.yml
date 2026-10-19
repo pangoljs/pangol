@@ -1,6 +1,6 @@
 name: release
 # Publishes packages/pangol to npm when a tag like v0.1.0-alpha.1 is pushed. The tag must match the
-# version in packages/pangol/package.json. Prereleases go to the `alpha` dist-tag (publishConfig).
+# version in packages/pangol/package.json. Prereleases go to their own dist-tag (alpha), never `latest`.
 #
 # Auth: npm trusted publishing (OIDC, no token) once it is set up for this repo on npmjs.com
 # (package settings -> Trusted publishing -> GitHub Actions, workflow release.yml). Until then, an
@@ -37,6 +37,11 @@ jobs:
       - run: pnpm build
       - name: Publish with provenance
         working-directory: packages/pangol
-        run: npm publish --provenance
+        # The dist-tag is passed explicitly: npm 12 ignores publishConfig.tag, and a prerelease must
+        # never become `latest`. 0.1.0-alpha.1 -> alpha, 0.1.0 -> latest.
+        run: |
+          version=$(node -p "require('./package.json').version")
+          case "$version" in *-*) tag="${version#*-}"; tag="${tag%%.*}" ;; *) tag=latest ;; esac
+          npm publish --provenance --tag "$tag"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
