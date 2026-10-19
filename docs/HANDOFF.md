@@ -144,11 +144,13 @@ workflow อยู่ใน main แล้ว; การมี workflow ไม�
 
 ตรวจจาก source บน main วันที่ 2026-10-19 หลัง PR #17; เป็นการตรวจ implementation และ workflow ไม่ใช่ production load test หรือการยืนยันสถานะ npm/Keycloak ของผู้ใช้ รายการด้านล่างเป็นข้อเสนอจัดลำดับ ไม่ได้ตัดสินคำถามเปิดของแต่ละงานแทนเจ้าของ
 
+**ตัวอย่างที่เพิ่ม:** [`examples/keycloak-postgres`](../examples/keycloak-postgres/README.md) มี Node backend, local Compose, PKCE login helper และ unit/integration tests สำหรับ Keycloak/PostgreSQL; ยังต้องทดสอบกับ realm/role ขององค์กรจริง และไม่ได้ปิดงาน lifecycle/config/proxy ของ framework
+
 **พร้อมทดลอง:** route/auth/owner, JSON validation/filtering, Node/Bun/fetch, CORS/CSRF, strict parser, security diff และ OpenAPI มีโค้ดและเทสต์แล้ว ตัวอย่าง starter ยังใช้ Map และ auth ที่ปฏิเสธทุก credential ไม่ใช่แอปที่ต่อ DB/login จริง
 
 | ลำดับ | งานและหลักฐานปัจจุบัน | ผลที่ต้องได้ก่อนถือว่าพร้อม |
 |---|---|---|
-| 1 | **แอปตัวอย่าง Keycloak + PostgreSQL**: [`auth.ts`](../packages/pangol/src/auth.ts) มี `defineAuth.resolve` แต่ไม่มีตัวตรวจ token ของ provider; starter ใช้ข้อมูลใน Map | ทดสอบ credential ที่ถูก/ผิด/หมดอายุ, issuer/audience, key rotation, mapping ตัวตนและ permissions; CRUD กับ DB จริง, transaction/rollback, migration และ owner isolation ทั้งอ่าน/แก้/ลบ รวม list ที่ไม่รั่วข้ามผู้ใช้ |
+| 1 | **แอปตัวอย่าง Keycloak + PostgreSQL**: [ตัวอย่างพร้อมทดลอง](../examples/keycloak-postgres/README.md) มี token verifier/DB จริงและเทสต์ local services แล้ว; core ยังคงมีเพียง `defineAuth.resolve` | เทสต์ local ครอบคลุม credential, claims, rotation, permissions, CRUD, transaction และ owner/list isolation แล้ว; งานต่อไปคือยืนยัน realm/role mapping และนโยบาย token ขององค์กรจริง |
 | 2 | **Lifecycle และการ deploy**: [`node.ts`](../packages/pangol/src/node.ts), [`bun.ts`](../packages/pangol/src/bun.ts) คืน server handle แต่ยังไม่มี `defineServices`/SIGTERM orchestration ตาม SPEC 12 | Startup ล้มเมื่อ config/DB ไม่พร้อม; แยก liveness/readiness; หยุดรับงานใหม่ รอ request และปิด DB pool ตาม deadline พร้อมเทสต์ทั้ง Node/Bun; ระหว่างนี้แอปจัดการ lifecycle เองได้ |
 | 3 | **`defineConfig`, `dev/serve` และขอบเขตการ mount**: [`main.ts`](../packages/pangol/src/cli/main.ts), [`build.ts`](../packages/pangol/src/cli/build.ts) ยังสร้างเพียง static route table; [`index.ts`](../packages/pangol/src/index.ts) ยังไม่ export config/services/Express adapter | กำหนด entry ของแอปและ lifecycle owner ก่อน; dev เห็น route เพิ่ม/ลบ, build ผิดไม่แทน server เดิม; serve ใช้ artifact ที่ทดสอบแล้ว; ยืนยัน basePath/mount ด้วย integration tests ก่อนประกาศรองรับ |
 | 4 | **พฤติกรรมหลัง reverse proxy และการวิเคราะห์ปัญหา**: Node ใช้ socket IP, Bun ใช้ requestIP; [`app.ts`](../packages/pangol/src/runtime/app.ts) ใช้ IP + user ID เป็น rate-limit key และมี log สำหรับ 500 | กำหนดขอบเขต proxy ที่เชื่อถือและทดสอบ forwarded headers ปลอม; แสดงผลต่อ anonymous rate limit หลัง proxy; ตัวอย่าง request ID/access log ที่ไม่บันทึก credential และตั้ง timeout ของ DB/provider แยกจาก HTTP timeout |

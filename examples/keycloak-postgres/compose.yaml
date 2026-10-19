@@ -1,0 +1,23 @@
+# Local demonstration only: fixed credentials, dev-mode Keycloak, loopback-bound ports.
+services:
+  postgres:
+    image: postgres:17@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
+    environment:
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: demo-local-only
+      POSTGRES_DB: pangol_demo
+    ports: ["127.0.0.1:55432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demo -d pangol_demo"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.1@sha256:79c623a22abacf3fe6c00a5fb30f5b7843d717b234033b80995891c06116d244
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: demo-local-only
+      KC_HOSTNAME: http://127.0.0.1:8080
+    ports: ["127.0.0.1:8080:8080"]
+    volumes: ["./keycloak:/opt/keycloak/data/import:ro"]

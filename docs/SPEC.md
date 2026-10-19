@@ -447,6 +447,10 @@ await api.patch('/posts/:id', { params: { id }, body: { title: 'New' } })
 
 **Services:** `defineServices({ onStart, onShutdown })` บน Node/Bun ดัก SIGTERM หยุดรับ connection ใหม่ ปิด keep-alive ที่ว่าง รอ request ที่ค้างไม่เกิน 25 s แล้วเรียก `onShutdown`; เมื่อเสียบเข้าแอปเดิม lifecycle เป็นของแอปเดิม
 
+### ตัวอย่าง backend ที่ใช้เป็นเอกสาร (2026-10-19)
+
+`examples/keycloak-postgres` เป็นแอปตัวอย่าง Node 22.18+ แยกจาก core: bearer access token จาก Keycloak (ThaiD เชื่อมที่ Keycloak), ตรวจ JWT ด้วย JWKS/issuer/audience/expiry และ map เฉพาะ client role ของ API เป็น permissions; identity ใน PostgreSQL ใช้คู่ issuer + subject. ตัวอย่าง posts มี CRUD, query รายการเฉพาะเจ้าของ, write ที่มี owner predicate ใน SQL และ transaction สำหรับ create + event. มี migration, local-only Compose, browser login แบบ Authorization Code + PKCE และเทสต์กับ provider/DB จริง โดย dependencies ของตัวอย่างไม่เข้ามาใน core. ยังไม่ใช่ HTML response หรือระบบ session cookie; รูปแบบนี้เป็นตัวอย่าง ไม่ได้บังคับแอปทุกตัวให้ใช้ bearer หรือ DB driver เดียวกัน
+
 **Eject (v0.3):** `pangol eject --to hono` แปลงทุก route เป็นโค้ด Hono ธรรมดา พร้อม helper ที่คัดลอกออกมา (ตัวกรอง response, strict parser, ตัวตรวจ magic bytes) โค้ดที่มีอยู่ยังปลอดภัยเท่าเดิม แต่การป้องกันการแก้ไขในอนาคต (build check, owner, diff) จะหายไป เอกสารต้องบอกตรงๆ
 
 ## 13. CLI
