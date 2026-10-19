@@ -1,0 +1,41 @@
+import assert from 'node:assert/strict'
+import { test } from 'node:test'
+import { createApp, defineAuth } from 'pangol'
+import { app } from '../src/app.js'
+import { routes } from '../.pangol/routes.js'
+
+// Test-only identities. Production auth must verify credentials with your provider.
+const authenticated = createApp({ routes, auth: defineAuth({
+  from: 'bearer',
+  resolve: (req) => req.credential === 'ada' || req.credential === 'grace'
+    ? { id: req.credential, permissions: [] } : null,
+}) })
+const request = (path: string, user?: string) => new Request(`http://localhost${path}`, {
+  headers: user === undefined ? {} : { authorization: `Bearer ${user}` },
+})
+
+test('public health route works', async () => {
+  const response = await app.fetch(request('/health'))
+  assert.equal(response.status, 200)
+  assert.deepEqual(await response.json(), { ok: true })
+})
+
+test('production auth rejects missing and unverified credentials', async () => {
+  for (const user of [undefined, 'ada', 'invalid']) {
+    assert.equal((await app.fetch(request('/posts/p1', user))).status, 401)
+  }
+})
+
+test('the owner gets only the public model fields', async () => {
+  const response = await authenticated.fetch(request('/posts/p1', 'ada'))
+  assert.equal(response.status, 200)
+  assert.deepEqual(await response.json(), { id: 'p1', title: 'Hello pangol', authorId: 'ada' })
+})
+
+test('another user and missing resources both get 404', async () => {
+  const other = await authenticated.fetch(request('/posts/p1', 'grace'))
+  const missing = await authenticated.fetch(request('/posts/missing', 'ada'))
+  assert.equal(other.status, 404)
+  assert.equal(missing.status, 404)
+  assert.deepEqual(await other.json(), await missing.json())
+})

@@ -1,0 +1,21 @@
+{
+  "name": "create-pangol",
+  "version": "0.1.0-alpha.0",
+  "description": "Create a TypeScript backend with pangol's validated routes and owner checks.",
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=22.18.0" },
+  "repository": { "type": "git", "url": "git+https://github.com/pangoljs/pangol.git", "directory": "packages/create-pangol" },
+  "bin": { "create-pangol": "dist/main.js" },
+  "files": ["dist", "template"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "test:bun": "npm run build && bun test test/",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm run typecheck && npm test"
+  },
+  "publishConfig": { "access": "public", "tag": "alpha" },
+  "devDependencies": { "@types/node": "^22.20.5", "typescript": "^5.9.3" }
+}

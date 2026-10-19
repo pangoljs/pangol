@@ -1,0 +1,5 @@
+import { defineAuth } from 'pangol'
+
+// Fail closed until connected to your real session provider.
+// Resolve a verified credential into { id, permissions }, or return null.
+export default defineAuth({ from: 'bearer', resolve: () => null })

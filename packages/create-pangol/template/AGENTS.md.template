@@ -1,0 +1,12 @@
+# Working on this pangol project
+
+- One file = one route in `src/routes/`: `health.get.ts`, `posts/[id].get.ts`.
+- Every route declares `auth`, schemas for its inputs, and `response`.
+- Ownership belongs in `owner`, with `load` providing `c.resource`. Never move it into the handler.
+- Failed ownership checks return 404, so callers cannot discover other users' records.
+- Never skip validation or response filtering. Mark secrets `.private()` and use model `.public()` for responses.
+- Use `t.money` for money, never floating point.
+- Run `npm run check` after every change, then `npm test` before committing.
+- Security changes need both positive and negative tests. Never weaken a test to pass.
+- Keep handlers synchronous when possible; avoid per-request allocation and unnecessary `async`.
+- `src/auth.ts` denies all credentials until connected to a real session provider. Test auth is only in `test/`.
