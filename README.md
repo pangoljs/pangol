@@ -46,6 +46,7 @@ export default route({
 |---|---|
 | [`docs/SPEC.md`](docs/SPEC.md) | Technical specification v0.1 (Thai) |
 | [`docs/DECISIONS.md`](docs/DECISIONS.md) | Decisions made and still open |
+| [`docs/HANDOFF.md`](docs/HANDOFF.md) | Where v0.1 stands and what to build next (Thai) |
 | [`poc/`](poc/) | Five proof-of-concept experiments with results and honest limitations |
 | [`packages/pangol`](packages/pangol) | The framework (v0.1, in progress) |
 | [`bench/`](bench/) | wrk benchmark against Hono and Elysia (SPEC section 14) |
