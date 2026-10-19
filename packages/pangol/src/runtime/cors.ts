@@ -31,8 +31,8 @@ function isOrigin(value: unknown): value is string {
 }
 
 /** Checks the options (problems are added to the list) and builds every header set. */
-export function compileCors(options: unknown, credentials: boolean, base: { json: Headers; empty: Headers }, problems: string[]): Cors | undefined {
-  const problem = (what: string, fix: string) => { problems.push(`✖ ${what}\n    Fix: ${fix}`) }
+export function compileCors(options: unknown, credentials: boolean, base: { json: Headers; empty: Headers }, problems: { what: string; fix: string }[]): Cors | undefined {
+  const problem = (what: string, fix: string) => { problems.push({ what, fix }) }
   if (typeof options !== 'object' || options === null) { problem('cors must be an object', "cors: { origins: ['https://app.example.com'] }"); return undefined }
   const before = problems.length
   for (const key of Object.keys(options)) {

@@ -19,10 +19,34 @@ Pre-alpha: nothing is published and the API can still change. See the
 - Startup checks: an app with an unsafe or invalid route (missing `owner` on a record route,
   `params` not matching the path, body on GET, unknown option…) refuses to start
 
-Not yet: file-based routing and the `pangol` CLI (`check`, `diff`, `build`),
-`t.multipart`, the typed client and OpenAPI.
+- File-based routing and the `pangol` CLI: `pangol check` (every rule of SPEC section 9 that
+  applies today, with the file and a fix), `pangol routes`, `pangol build` (writes `.pangol/routes.ts`).
+  `node --import pangol/register` runs a TypeScript app on Node 22.18+; Bun runs it as is.
 
-## Example
+Not yet: `pangol diff` and the security manifest, `pangol dev`/`serve`, `t.multipart`, the typed
+client and OpenAPI.
+
+## Project layout
+
+```
+src/
+  auth.ts                  export default defineAuth({ from, resolve })
+  models.ts                t.model(...) shared by routes
+  routes/
+    health.get.ts          GET  /health     export default route({...})
+    posts/index.post.ts    POST /posts
+    posts/[id].patch.ts    PATCH /posts/:id
+    posts/_helpers.ts      not a route (starts with _)
+  server.ts                createApp({ auth, routes }) with routes from .pangol/routes.js
+```
+
+```sh
+npx pangol check     # rules of SPEC section 9, exit 1 with a fix for each problem
+npx pangol build     # check, then write .pangol/routes.ts (add .pangol/ to .gitignore)
+bun src/server.ts    # or: node --import pangol/register src/server.ts
+```
+
+## Example (one file)
 
 ```ts
 import { createApp, defineAuth, route, t } from 'pangol'
