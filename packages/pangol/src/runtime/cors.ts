@@ -57,11 +57,11 @@ export function compileCors(options: unknown, credentials: boolean, base: { json
 
   const allowHeaders = [...new Set(['authorization', 'content-type', ...headers.map((h) => h.toLowerCase())])].join(', ')
   const vary = { vary: 'origin' }
-  const other = { json: { ...base.json, ...vary }, empty: { ...base.empty, ...vary } }
+  const other = { json: Object.freeze({ ...base.json, ...vary }), empty: Object.freeze({ ...base.empty, ...vary }) }
   const listed = new Map((origins as string[]).map((origin) => {
     const allow = { 'access-control-allow-origin': origin, ...(credentials && { 'access-control-allow-credentials': 'true' }), ...vary }
     const preflight = { ...base.empty, ...allow, 'access-control-allow-headers': allowHeaders, 'access-control-max-age': String(maxAge) }
-    return [origin, { json: { ...base.json, ...allow }, empty: { ...base.empty, ...allow }, preflight }] as const
+    return [origin, { json: Object.freeze({ ...base.json, ...allow }), empty: Object.freeze({ ...base.empty, ...allow }), preflight }] as const
   }))
   return {
     origins: new Set(listed.keys()),

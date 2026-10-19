@@ -1,7 +1,7 @@
 # Security policy
 
-pangol is pre-alpha and has no supported release yet. Even so, please report
-security problems privately.
+pangol is in alpha (0.1.0-alpha). Security fixes go into the latest alpha release; there is no
+long-term support before 0.1.0. Please report security problems privately.
 
 ## Reporting
 

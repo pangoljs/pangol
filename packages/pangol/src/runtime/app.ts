@@ -57,14 +57,25 @@ const FORBIDDEN = error(403, 'forbidden')
 const INTERNAL = error(500, 'internal error')
 const NO_CONTENT = new Out(204, null)
 
-export const SECURITY_HEADERS = { 'x-content-type-options': 'nosniff', 'x-frame-options': 'DENY', 'cache-control': 'no-store' }
-export const JSON_HEADERS = { ...SECURITY_HEADERS, 'content-type': 'application/json' }
+// Frozen header sets are the ones built at startup; fetch responses reuse a Headers made from each.
+export const SECURITY_HEADERS = Object.freeze({ 'x-content-type-options': 'nosniff', 'x-frame-options': 'DENY', 'cache-control': 'no-store' })
+export const JSON_HEADERS = Object.freeze({ ...SECURITY_HEADERS, 'content-type': 'application/json' })
 /** The headers to send with `out`, for every adapter. */
 export function headersOf(out: Out): Readonly<Record<string, string>> {
   const headers = out.headers ?? (out.body === null ? SECURITY_HEADERS : JSON_HEADERS)
   return out.allow === undefined ? headers : { ...headers, allow: out.allow }
 }
-const toResponse = (out: Out) => new Response(out.body, { status: out.status, headers: headersOf(out) })
+// Building a Response from a prepared Headers is about twice as fast on Bun as from a plain object.
+// Safe to share: the Response constructor copies its init headers (tested: a host changing one
+// response's headers never changes the next).
+const prepared = new WeakMap<object, Headers>()
+function fetchHeaders(headers: Readonly<Record<string, string>>): HeadersInit {
+  if (!Object.isFrozen(headers)) return headers // per request (Allow, preflight): not worth keeping
+  let h = prepared.get(headers)
+  if (h === undefined) prepared.set(headers, h = new Headers(headers))
+  return h
+}
+const toResponse = (out: Out) => new Response(out.body, { status: out.status, headers: fetchHeaders(headersOf(out)) })
 
 // What c.fail / c.created / c.noContent return. The symbol is private, so a handler cannot forge one.
 const RESULT = Symbol('pangol.result')
@@ -87,7 +98,6 @@ const FAIL_STATUS = new Set([400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 4
 type Step = Out | Promise<Out>
 const isThenable = (v: unknown): v is PromiseLike<unknown> =>
   (typeof v === 'object' || typeof v === 'function') && v !== null && typeof (v as { then?: unknown }).then === 'function'
-const then = (v: unknown, next: (value: unknown) => Step): Step => (isThenable(v) ? Promise.resolve(v).then(next) : next(v))
 
 // ---------------------------------------------------------------- startup checks
 
@@ -202,10 +212,26 @@ export interface Incoming {
   readonly readBody: (limit: number) => Promise<Uint8Array>
 }
 
-interface Context {
-  params: unknown; query: unknown; body: unknown; resource: unknown
-  readonly user: User | null; readonly ip: string; readonly headers: Headers
-  readonly fail: typeof helpers.fail; readonly created: typeof helpers.created; readonly noContent: typeof helpers.noContent
+// The handler's `c`. A class, not an object literal: a getter written in a per-request literal is
+// defined at run time with a new closure each time, which made V8 pretenure and then deopt the
+// allocation in a loop (a full GC every ~100 ms under load, 3.6x the CPU per request).
+class Context {
+  query: unknown = undefined
+  body: unknown = undefined
+  resource: unknown = undefined
+  readonly #req: Incoming
+  constructor(public params: unknown, readonly user: User | null, req: Incoming) {
+    this.#req = req
+  }
+
+  /** The client address; adapters may look it up only when it is read. */
+  get ip(): string { return this.#req.ip }
+  /** Read only when the handler asks, so adapters can build Headers lazily. */
+  get headers(): Headers { return this.#req.headers }
+  // On the prototype; they do not use `this`, so `({ fail }) => fail(409, '…')` works.
+  fail(status: unknown, message: unknown): Result { return helpers.fail(status, message) }
+  created(value: unknown): Result { return helpers.created(value) }
+  noContent(): Result { return NO_CONTENT_RESULT }
 }
 
 function parseQuery(qs: string): Record<string, string> {
@@ -262,28 +288,29 @@ export function createApp(options: AppOptions): App {
 
   function authenticate(route: Compiled, req: Incoming): User | null | Out | Promise<User | null | Out> {
     if (route.auth === 'public' || auth === undefined) return null
-    const cookies = parseCookies(req.header('cookie'))
+    let cookies: Map<string, string | null> | undefined // parsed only when used
+    const jar = () => (cookies ??= parseCookies(req.header('cookie')))
     const from = auth.from
-    const credential = from === 'bearer' ? bearerToken(req.header('authorization')) : cookieCredential(cookies, from.cookie)
+    const credential = from === 'bearer' ? bearerToken(req.header('authorization')) : cookieCredential(jar(), from.cookie)
     if (credential === null) return UNAUTHORIZED
     if (credential === undefined) return route.auth === 'optional' ? null : UNAUTHORIZED
     if (from !== 'bearer' && UNSAFE.has(req.method) && !sameOriginOrAllowed(req.header, req.host, trusted)) return error(403, 'cross-origin request blocked')
     const request: AuthRequest = {
       method: req.method, url: req.target, credential,
       headers: { get: (name) => req.header(name) },
-      cookies: { get: (name) => cookies.get(name) ?? undefined },
-    }
-    const check = (u: unknown): User | Out => {
-      if (u === null || u === undefined) return UNAUTHORIZED
-      if (typeof u !== 'object' || typeof (u as User).id !== 'string' || !Array.isArray((u as User).permissions)) {
-        log(`[pangol] ${route.key}: auth.resolve must return { id: string, permissions: string[] } or null`)
-        return INTERNAL
-      }
-      const required = route.auth
-      return typeof required === 'object' && !(u as User).permissions.includes(required.permission) ? FORBIDDEN : u as User
+      cookies: { get: (name) => jar().get(name) ?? undefined },
     }
     const user = auth.resolve(request) // awaited when it is a Promise: a pending Promise is not a user (audit C3)
-    return isThenable(user) ? Promise.resolve(user).then(check) : check(user)
+    return isThenable(user) ? Promise.resolve(user).then((u) => checkUser(route, u)) : checkUser(route, user)
+  }
+  function checkUser(route: Compiled, u: unknown): User | Out {
+    if (u === null || u === undefined) return UNAUTHORIZED
+    if (typeof u !== 'object' || typeof (u as User).id !== 'string' || !Array.isArray((u as User).permissions)) {
+      log(`[pangol] ${route.key}: auth.resolve must return { id: string, permissions: string[] } or null`)
+      return INTERNAL
+    }
+    const required = route.auth
+    return typeof required === 'object' && !(u as User).permissions.includes(required.permission) ? FORBIDDEN : u as User
   }
 
   function finish(route: Compiled, out: unknown): Out {
@@ -304,31 +331,40 @@ export function createApp(options: AppOptions): App {
     return new Out(200, route.serialize(out))
   }
 
+  // load -> owner -> handler. Written without per-request closures on the synchronous path.
   function afterInput(route: Compiled, c: Context): Step {
-    const handle = () => then(route.handler(c), (out) => finish(route, out))
-    if (route.load === undefined) return handle()
-    return then(route.load(c), (record) => {
-      if (record === null || record === undefined) return NOT_FOUND
-      const accept = () => { c.resource = record; return handle() }
-      if (route.owner === undefined) return accept()
-      // not the owner -> 404 like a missing record, so callers cannot learn which ids exist
-      return then(route.owner(c, record), (allowed) => (allowed === true ? accept() : NOT_FOUND))
-    })
+    if (route.load === undefined) return runHandler(route, c)
+    const record = route.load(c)
+    return isThenable(record) ? Promise.resolve(record).then((r) => withRecord(route, c, r)) : withRecord(route, c, record)
+  }
+  function withRecord(route: Compiled, c: Context, record: unknown): Step {
+    if (record === null || record === undefined) return NOT_FOUND
+    if (route.owner === undefined) return accept(route, c, record, true)
+    const allowed = route.owner(c, record)
+    return isThenable(allowed) ? Promise.resolve(allowed).then((a) => accept(route, c, record, a)) : accept(route, c, record, allowed)
+  }
+  function accept(route: Compiled, c: Context, record: unknown, allowed: unknown): Step {
+    if (allowed !== true) return NOT_FOUND // not the owner -> 404 like a missing record, so callers cannot learn which ids exist
+    c.resource = record
+    return runHandler(route, c)
+  }
+  function runHandler(route: Compiled, c: Context): Step {
+    const out = route.handler(c)
+    return isThenable(out) ? Promise.resolve(out).then((o) => finish(route, o)) : finish(route, out)
   }
 
   function afterAuth(route: Compiled, req: Incoming, values: readonly string[], user: User | null): Step {
     if (route.limiter !== undefined && !route.limiter.hit(`${req.ip}|${user?.id ?? ''}`)) return error(429, 'too many requests')
     const raw: Record<string, string> = {}
-    route.names.forEach((name, i) => {
+    const names = route.names
+    for (let i = 0; i < names.length; i++) {
+      const name = names[i] as string
       let v: string
       try { v = decodeURIComponent(values[i] ?? '') } catch { throw new ValidationError(`params.${name}`, 'is invalid') }
       if (!safeSegment(v) || v.length > 200) throw new ValidationError(`params.${name}`, 'is invalid')
       raw[name] = v
-    })
-    const c: Context = {
-      params: route.params ? route.params(raw) : raw, query: undefined, body: undefined, resource: undefined,
-      user, ip: req.ip, get headers() { return req.headers }, ...helpers,
     }
+    const c = new Context(route.params ? route.params(raw) : raw, user, req)
     if (route.query) c.query = route.query(parseQuery(req.query))
     if (route.body === undefined) return afterInput(route, c)
     if (!isJson(req.header('content-type'))) return error(415, 'expected application/json')
@@ -339,10 +375,12 @@ export function createApp(options: AppOptions): App {
     })
   }
 
+  const afterUser = (route: Compiled, req: Incoming, values: readonly string[], u: User | null | Out): Step =>
+    (u instanceof Out ? u : afterAuth(route, req, values, u))
   function run(route: Compiled, req: Incoming, values: readonly string[]): Step {
     try {
       const user = authenticate(route, req)
-      const out = then(user, (u) => (u instanceof Out ? u : afterAuth(route, req, values, u as User | null)))
+      const out = isThenable(user) ? Promise.resolve(user).then((u) => afterUser(route, req, values, u)) : afterUser(route, req, values, user)
       return isThenable(out) ? out.then(undefined, (e: unknown) => fail(route, e)) : out
     } catch (e) {
       return fail(route, e)
@@ -376,34 +414,63 @@ export function createApp(options: AppOptions): App {
     return isThenable(out) ? out.then(decorate) : decorate(out)
   }
 
+  // A Response when every step was synchronous, so a server that accepts one skips a Promise.
+  const respond: Respond = (request, ip) => {
+    const header = (name: string) => request.headers.get(name)
+    const out = handle(request.method, request.url, header, (target, query) => new FetchIncoming(request, target, query, header, ip))
+    return isThenable(out) ? out.then(toResponse) : toResponse(out)
+  }
   const app: App = {
     limits: Object.freeze({ body: bodyLimit }),
     fetch(request, info = {}) {
-      const url = request.url
-      const header = (name: string) => request.headers.get(name)
-      const out = handle(request.method, url, header, (target, query) => ({
-        method: request.method, target, query,
-        host: request.headers.get('host') ?? new URL(url).host, ip: info.ip ?? '',
-        headers: request.headers, header, readBody: (limit) => readBody(request, limit),
-      }))
-      return isThenable(out) ? out.then(toResponse) : Promise.resolve(toResponse(out))
+      const ip = info.ip ?? ''
+      return Promise.resolve(respond(request, () => ip))
     },
   }
-  handlers.set(app, handle)
+  handlers.set(app, { handle, respond })
   return app
 }
 
 export type Handle = (method: string, url: string, header: (name: string) => string | null, incoming: (target: string, query: string) => Incoming) => Out | Promise<Out>
-const handlers = new WeakMap<App, Handle>()
+/** Answer a fetch Request; `ip` is called only if the route needs the client address. */
+export type Respond = (request: Request, ip: () => string) => Response | Promise<Response>
+const handlers = new WeakMap<App, { readonly handle: Handle; readonly respond: Respond }>()
 const BAD_PATH = error(400, 'invalid path')
 const CORS_BLOCKED = error(403, 'origin not allowed')
 const METHOD_NOT_ALLOWED = JSON.stringify({ error: 'method not allowed' })
 
 /** For adapters in this package: the app's request handler without the fetch Request/Response wrapping. */
 export function handlerOf(app: App): Handle {
-  const handle = handlers.get(app)
-  if (handle === undefined) throw new TypeError('expected an app from createApp()')
-  return handle
+  return internals(app).handle
+}
+
+/** For fetch-style adapters in this package (Bun): app.fetch without the Promise when not needed. */
+export function responderOf(app: App): Respond {
+  return internals(app).respond
+}
+
+function internals(app: App) {
+  const found = handlers.get(app)
+  if (found === undefined) throw new TypeError('expected an app from createApp()')
+  return found
+}
+
+// A fetch Request as the pipeline sees it. Getters on a class prototype, not in a literal (see Context).
+class FetchIncoming implements Incoming {
+  readonly method: string
+  readonly #request: Request
+  readonly #ipOf: () => string
+  #ip: string | undefined
+  constructor(request: Request, readonly target: string, readonly query: string, readonly header: (name: string) => string | null, ip: () => string) {
+    this.#request = request
+    this.#ipOf = ip
+    this.method = request.method
+  }
+
+  get headers(): Headers { return this.#request.headers }
+  get host(): string { return this.#request.headers.get('host') ?? new URL(this.#request.url).host }
+  get ip(): string { return this.#ip ??= this.#ipOf() }
+  readBody(limit: number): Promise<Uint8Array> { return readBody(this.#request, limit) }
 }
 
 async function readBody(request: Request, limit: number): Promise<Uint8Array> {
@@ -411,7 +478,14 @@ async function readBody(request: Request, limit: number): Promise<Uint8Array> {
   if (length !== null) {
     if (!/^[0-9]{1,15}$/.test(length)) throw new Reject(400, 'bad_content_length')
     if (Number(length) > limit) throw new Reject(413, 'body_too_large')
+    // A declared length within the limit: the server framed the body by it, so read it in one call.
+    // Never touching request.body matters on Bun, where creating the stream and reading it chunk by
+    // chunk was 5x slower. The size is checked again for in-process callers whose header may be wrong.
+    const bytes = new Uint8Array(await request.arrayBuffer())
+    if (bytes.byteLength > limit) throw new Reject(413, 'body_too_large')
+    return bytes
   }
+  // No length (chunked or a stream): read chunk by chunk and stop as soon as the limit is passed.
   if (request.body === null) return new Uint8Array(0)
   const reader = request.body.getReader()
   const chunks: Uint8Array[] = []

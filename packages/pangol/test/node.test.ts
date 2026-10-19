@@ -1,7 +1,7 @@
 /// <reference types="node" />
 // The Node adapter on node:http. Runs on Node only; Bun has pangol/bun.
 import type { AddressInfo } from 'node:net'
-import type { Server } from 'node:http'
+import { Agent, type Server } from 'node:http'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp, defineAuth, route, t } from '../src/index.js'
 import { createServer } from '../src/node.js'
@@ -22,6 +22,7 @@ describe.runIf(!onBun)('node:http adapter', () => {
       'GET /agent': route({ auth: 'public', response: t.string(), handler: (c) => c.headers.get('user-agent') ?? '' }),
       'POST /echo': route({ auth: 'public', body: t.object({ s: t.string() }), response: t.string(), handler: (c) => c.body.s }),
       'GET /boom': route({ auth: 'public', response: t.string(), handler: () => { throw new Error('boom') } }),
+      'GET /ip': route({ auth: 'public', response: t.string(), handler: (c) => c.ip }),
     },
   })
 
@@ -53,6 +54,37 @@ describe.runIf(!onBun)('node:http adapter', () => {
     expect(res.status).toBe(413)
     expect(res.headers['connection']).toBe('close')
     expect((await raw(port, 'POST', '/echo', { 'content-type': 'application/json' }, '{"s":"hi"}')).body).toBe('"hi"')
+  })
+
+  it('keeps connections alive: a bodiless request is complete even before Node says so', async () => {
+    // regression: `req.complete` is still false while the 'request' event runs, so every response
+    // said `connection: close` and each request paid for a new TCP connection
+    let connections = 0
+    const count = () => { connections++ }
+    server.on('connection', count)
+    const agent = new Agent({ keepAlive: true, maxSockets: 1 })
+    try {
+      for (const [method, path, body] of [['GET', '/health'], ['GET', '/me'], ['POST', '/echo', '{"s":"hi"}'], ['GET', '/health']] as const) {
+        const res = await raw(port, method, path, { 'content-type': 'application/json' }, body, agent)
+        expect(res.headers['connection'], `${method} ${path}`).not.toBe('close')
+        expect(res.headers['content-length'], `${method} ${path}`).toBe(String(Buffer.byteLength(res.body)))
+      }
+      expect(connections).toBe(1)
+    } finally {
+      agent.destroy()
+      server.off('connection', count)
+    }
+  })
+
+  it('closes the connection when a body was sent but never read', async () => {
+    // GET /health reads no body; one that arrives anyway must not be drained by the server
+    const res = await raw(port, 'GET', '/health', { 'content-type': 'application/json', 'content-length': '5' }, 'hello')
+    expect(res.status).toBe(200)
+    expect(res.headers['connection']).toBe('close')
+  })
+
+  it('gives handlers the client address', async () => {
+    expect((await raw(port, 'GET', '/ip')).body).toMatch(/127\.0\.0\.1/)
   })
 
   it('a handler that throws is a 500 and the server keeps running', async () => {

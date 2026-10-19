@@ -20,13 +20,7 @@ export function createServer(app: App): Server {
     // node:http keeps only the first of some repeated headers (Authorization, Content-Type…);
     // join them like the fetch API does, so a repeated header is malformed rather than first-wins.
     const header = (name: string): string | null => req.headersDistinct[name]?.join(name === 'cookie' ? '; ' : ', ') ?? null
-    let headers: Headers | undefined
-    const incoming = (target: string, query: string): Incoming => ({
-      method: req.method ?? '', target, query, host: req.headers.host ?? '', ip: req.socket.remoteAddress ?? '',
-      get headers() { return headers ??= toHeaders(req) },
-      header,
-      readBody: (limit) => readBody(req, limit),
-    })
+    const incoming = (target: string, query: string): Incoming => new NodeIncoming(req, target, query, header)
     let out: Out | Promise<Out>
     try { out = handle(req.method ?? '', req.url ?? '', header, incoming) } catch { out = INTERNAL }
     if (out instanceof Out) send(req, res, out) // synchronous routes answer without a Promise
@@ -45,11 +39,35 @@ export function serve(app: App, options: ServeOptions = {}): Server {
 
 function send(req: IncomingMessage, res: ServerResponse, out: Out): void {
   if (res.headersSent || res.destroyed) return
-  const headers = headersOf(out)
-  // A body left unread (too large, or a route without one) would be read and discarded to keep the
-  // connection alive; close it instead, so a client cannot make the server swallow a huge upload.
-  res.writeHead(out.status, req.complete ? headers : { ...headers, connection: 'close' })
-  res.end(out.body ?? undefined)
+  // A declared body left unread (too large, or a route without one) would be read and discarded to keep
+  // the connection alive; close it instead, so a client cannot make the server swallow a huge upload.
+  // `req.complete` alone is not enough: Node sets it after the 'request' event, so while a synchronous
+  // route answers, even a bodiless GET is not "complete" yet.
+  const unread = !req.complete && (req.headers['transfer-encoding'] !== undefined || (req.headers['content-length'] ?? '0') !== '0')
+  const body = out.body
+  res.writeHead(out.status, {
+    ...headersOf(out),
+    ...(body !== null && { 'content-length': String(Buffer.byteLength(body)) }), // not chunked
+    ...(unread && { connection: 'close' }),
+  })
+  res.end(body ?? undefined)
+}
+
+// A class, so the lazy `headers` getter lives on the prototype (see Context in runtime/app.ts).
+class NodeIncoming implements Incoming {
+  readonly method: string
+  readonly host: string
+  readonly #req: IncomingMessage
+  #headers: Headers | undefined
+  constructor(req: IncomingMessage, readonly target: string, readonly query: string, readonly header: (name: string) => string | null) {
+    this.#req = req
+    this.method = req.method ?? ''
+    this.host = req.headers.host ?? ''
+  }
+
+  get ip(): string { return this.#req.socket.remoteAddress ?? '' }
+  get headers(): Headers { return this.#headers ??= toHeaders(this.#req) }
+  readBody(limit: number): Promise<Uint8Array> { return readBody(this.#req, limit) }
 }
 
 function toHeaders(req: IncomingMessage): Headers {
