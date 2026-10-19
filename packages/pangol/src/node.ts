@@ -45,11 +45,18 @@ export function serve(app: App, options: ServeOptions = {}): Server {
 
 function send(req: IncomingMessage, res: ServerResponse, out: Out): void {
   if (res.headersSent || res.destroyed) return
-  const headers = headersOf(out)
-  // A body left unread (too large, or a route without one) would be read and discarded to keep the
-  // connection alive; close it instead, so a client cannot make the server swallow a huge upload.
-  res.writeHead(out.status, req.complete ? headers : { ...headers, connection: 'close' })
-  res.end(out.body ?? undefined)
+  // A declared body left unread (too large, or a route without one) would be read and discarded to keep
+  // the connection alive; close it instead, so a client cannot make the server swallow a huge upload.
+  // `req.complete` alone is not enough: Node sets it after the 'request' event, so while a synchronous
+  // route answers, even a bodiless GET is not "complete" yet.
+  const unread = !req.complete && (req.headers['transfer-encoding'] !== undefined || (req.headers['content-length'] ?? '0') !== '0')
+  const body = out.body
+  res.writeHead(out.status, {
+    ...headersOf(out),
+    ...(body !== null && { 'content-length': String(Buffer.byteLength(body)) }), // not chunked
+    ...(unread && { connection: 'close' }),
+  })
+  res.end(body ?? undefined)
 }
 
 function toHeaders(req: IncomingMessage): Headers {
