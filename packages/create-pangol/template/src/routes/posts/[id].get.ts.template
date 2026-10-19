@@ -1,0 +1,16 @@
+import { route, t } from 'pangol'
+import { Post } from '../../models.js'
+
+// Replace this example data with your database lookup.
+const posts = new Map([
+  ['p1', { id: 'p1', title: 'Hello pangol', authorId: 'ada', internalNote: 'Never send this to a client' }],
+])
+
+export default route({
+  auth: 'user',
+  params: t.object({ id: t.id() }),
+  load: (c) => posts.get(c.params.id),
+  owner: (c, post) => post.authorId === c.user.id,
+  response: Post.public(),
+  handler: (c) => c.resource,
+})

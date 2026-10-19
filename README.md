@@ -49,6 +49,7 @@ export default route({
 | [`docs/HANDOFF.md`](docs/HANDOFF.md) | Where v0.1 stands and what to build next (Thai) |
 | [`poc/`](poc/) | Five proof-of-concept experiments with results and honest limitations |
 | [`packages/pangol`](packages/pangol) | The framework (v0.1, in progress) |
+| [`packages/create-pangol`](packages/create-pangol) | Project initializer with Node/Bun templates (pending npm publication) |
 | [`bench/`](bench/) | wrk benchmark against Hono and Elysia (SPEC section 14) |
 | [`docs/brand/`](docs/brand/) | Logo and mascot assets |
 

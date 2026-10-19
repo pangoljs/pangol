@@ -1,0 +1,23 @@
+{
+  "name": "__PROJECT_NAME__",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "dev": "npm run build && __DEV_COMMAND__",
+    "start": "__START_COMMAND__",
+    "check": "pangol check",
+    "build": "pangol build && tsc --noEmit",
+    "test": "npm run build && __TEST_COMMAND__"
+  },
+  "dependencies": {
+    "pangol": "0.1.0-alpha.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "^5.9.3"
+  }
+}

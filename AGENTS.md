@@ -6,6 +6,7 @@ build errors, and every risky change shows up in the PR. Read `docs/SPEC.md` bef
 ## Repo map
 
 - `packages/pangol/` — the framework (v0.1 in progress). Source in `src/`, tests in `test/`.
+- `packages/create-pangol/` — zero-dependency project initializer and tested Node/Bun templates.
 - `docs/SPEC.md` — the specification. Source of truth for behaviour.
 - `docs/DECISIONS.md` — decided and open questions. Do not silently decide an open one; ask.
 - `docs/HANDOFF.md` — current state and the next v0.1 tasks, with the questions to ask before each.

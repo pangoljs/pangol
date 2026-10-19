@@ -1,0 +1,8 @@
+import { t } from 'pangol'
+
+export const Post = t.model({
+  id: t.id(),
+  title: t.string(),
+  authorId: t.id(),
+  internalNote: t.string().private(),
+})

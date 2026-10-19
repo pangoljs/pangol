@@ -111,6 +111,9 @@
 
 ### 3.5 `npm create pangol`
 
+**อัปเดต 2026-10-19:** implementation อยู่ใน `packages/create-pangol` พร้อม template Node/Bun, fail-closed auth, และเทสต์จาก tarball จริง; ยังไม่ publish บน npm. Version แยกจาก `pangol` ตามที่เจ้าของเลือก และ template pin `pangol@0.1.0-alpha.0`. เนื่องจาก `pangol dev/serve` ยังไม่พร้อม จึงใช้ `src/server.ts` กับ adapter ที่มีแล้ว และ runtime watcher; เพิ่ม/ลบ route ต้อง restart `npm run dev`. วิธี publish ครั้งแรกและตั้ง trusted publisher อยู่ใน `packages/create-pangol/README.md`.
+
+
 **SPEC:** 13, 16 (AGENTS.md ในทุกโปรเจกต์ใหม่)
 
 **แนวทาง**
@@ -118,7 +121,7 @@
 - Template: `package.json` (scripts: `dev`, `check`, `build`, `test`), `tsconfig.json`, `src/auth.ts`, `src/models.ts`, `src/routes/health.get.ts`, `src/routes/posts/[id].get.ts` (ตัวอย่าง load+owner), เทสต์หนึ่งไฟล์, `AGENTS.md` (กฎ 1 ไฟล์ 1 route, กฎเจ้าของอยู่ใน `owner`, รัน `npm run check` หลังแก้ทุกครั้ง), `.gitignore` (`.pangol/`)
 - ถามแค่ชื่อโฟลเดอร์และรันไทม์ (Bun / Node); ไม่ติดตั้งให้เองถ้าไม่ได้สั่ง
 
-**ถามก่อนเริ่ม:** ต้องจองชื่อ `create-pangol` บน npm (เจ้าของทำเอง เหมือนตอน publish `pangol`) และ release ของสองแพ็กเกจนี้ผูก version กันไหม
+**ตัดสินแล้ว:** แยก version ของสองแพ็กเกจ; template pin framework รุ่นที่ทดสอบแล้ว. **เหลือขั้นตอนเจ้าของ:** publish `create-pangol` ครั้งแรกบน npm และตั้ง trusted publisher ของแพ็กเกจนี้.
 
 **เสร็จเมื่อ:** CI สร้างโปรเจกต์จาก template แล้วรัน `check`, `test`, `build` ผ่านทั้ง Node และ Bun; ทุกตัวอย่างในเอกสารผ่าน `pangol check` (กฎใน CONTRIBUTING)
 

@@ -1,0 +1,22 @@
+# __PROJECT_NAME__
+
+TypeScript API using pangol on __RUNTIME__. Node 22.18+ is required for Node scripts; the Bun template also needs Bun.
+
+```sh
+npm install
+npm test
+npm run dev
+```
+
+Visit http://127.0.0.1:3000/health. `npm run check` checks all routes;
+`npm run build` generates `.pangol/routes.ts` and typechecks the project.
+`npm start` runs the server after a build.
+
+The runtime watcher restarts on changes to imported files. After adding or removing route files,
+restart `npm run dev` to regenerate the route table. This starter uses a server entry point
+until the framework's `pangol dev/serve` commands are available.
+
+`src/auth.ts` rejects every credential until you connect a real session provider.
+The posts example uses in-memory sample data; tests supply their own auth resolver.
+An authenticated owner gets a filtered response; a different user and a missing post both get 404.
+The server binds to loopback on port 3000; edit `src/server.ts` to change it.
