@@ -5,6 +5,7 @@ import type { AuthDefinition, AuthRequest, User } from '../auth.js'
 import { Reject, checkPath, decodeUtf8, isJson, parseJson, pathFromUrl, safeSegment } from '../core/strict.js'
 import { Schema } from '../schema.js'
 import { toDef } from './def.js'
+import { compileCors, type CorsOptions } from './cors.js'
 import { bearerToken, cookieCredential, parseCookies, sameOriginOrAllowed } from './credentials.js'
 import { createLimiter, type Limiter } from './ratelimit.js'
 import { Router, type Method } from './router.js'
@@ -17,8 +18,11 @@ export interface AppOptions {
   readonly auth?: AuthDefinition<User>
   /** `'GET /posts/:id': route({...})`. File-based routing generates this table. */
   readonly routes: Readonly<Record<RouteKey, object>>
-  /** Origins trusted for cross-origin requests (cookie auth). CORS headers are not sent yet. */
-  readonly cors?: { readonly origins: readonly string[] }
+  /**
+   * Browser apps on other origins that may call this API: they get CORS headers, and cookie auth
+   * trusts them for writes (SPEC section 12). Off when left out.
+   */
+  readonly cors?: CorsOptions
   readonly limits?: { readonly body?: number }
   /** Server-side log for 500s; details never reach the client. Default: console.error. */
   readonly log?: (message: string) => void
@@ -37,7 +41,13 @@ export interface App {
 // ---------------------------------------------------------------- responses
 
 export class Out {
-  constructor(readonly status: number, readonly body: string | null, readonly allow?: string) {}
+  constructor(
+    readonly status: number,
+    readonly body: string | null,
+    readonly allow?: string,
+    /** Replaces the default headers (CORS); built at startup, so sending never merges. */
+    readonly headers?: Readonly<Record<string, string>>,
+  ) {}
 }
 const error = (status: number, message: string, field?: string) =>
   new Out(status, JSON.stringify(field === undefined ? { error: message } : { error: message, field }))
@@ -49,10 +59,12 @@ const NO_CONTENT = new Out(204, null)
 
 export const SECURITY_HEADERS = { 'x-content-type-options': 'nosniff', 'x-frame-options': 'DENY', 'cache-control': 'no-store' }
 export const JSON_HEADERS = { ...SECURITY_HEADERS, 'content-type': 'application/json' }
-function toResponse(out: Out): Response {
-  const headers = out.body === null ? SECURITY_HEADERS : out.allow === undefined ? JSON_HEADERS : { ...JSON_HEADERS, allow: out.allow }
-  return new Response(out.body, { status: out.status, headers })
+/** The headers to send with `out`, for every adapter. */
+export function headersOf(out: Out): Readonly<Record<string, string>> {
+  const headers = out.headers ?? (out.body === null ? SECURITY_HEADERS : JSON_HEADERS)
+  return out.allow === undefined ? headers : { ...headers, allow: out.allow }
 }
+const toResponse = (out: Out) => new Response(out.body, { status: out.status, headers: headersOf(out) })
 
 // What c.fail / c.created / c.noContent return. The symbol is private, so a handler cannot forge one.
 const RESULT = Symbol('pangol.result')
@@ -116,41 +128,46 @@ interface Compiled {
   readonly limiter?: Limiter
 }
 
-function compileRoute(key: string, def: Definition, hasAuth: boolean, problems: string[]): { method: Method; path: string; route: Compiled } | null {
+/** A startup check that failed. `key` is the route it belongs to, if any. */
+export interface Problem { readonly key?: string; readonly what: string; readonly fix: string; readonly rule?: string }
+const format = (p: Problem) => `✖ ${p.key === undefined ? '' : p.key + ': '}${p.what}\n    Fix: ${p.fix}`
+
+function compileRoute(key: string, def: Definition, hasAuth: boolean, problems: Problem[]): { method: Method; path: string; route: Compiled } | null {
   const before = problems.length
-  const problem = (what: string, fix: string) => problems.push(`✖ ${key}: ${what}\n    Fix: ${fix}`)
+  // `rule` is the check number of SPEC section 9
+  const problem = (what: string, fix: string, rule?: string) => problems.push({ key, what, fix, ...(rule !== undefined && { rule }) })
   const m = KEY.exec(key)
-  if (m === null) { problem('a route key is "<METHOD> <path>"', "use e.g. 'GET /posts/:id' with GET, POST, PUT, PATCH or DELETE"); return null }
+  if (m === null) { problem('a route key is "<METHOD> <path>"', "use e.g. 'GET /posts/:id' with GET, POST, PUT, PATCH or DELETE", 'C14'); return null }
   const method = m[1] as Method, path = m[2] as string
   const segments = path.split('/').slice(1)
   if (checkPath(path) === null || segments.some((s) => s.startsWith(':') && !PARAM.test(s))) {
-    problem('the path is not canonical', 'no trailing slash, no empty, "." or ".." segments; params look like :id')
+    problem('the path is not canonical', 'no trailing slash, no empty, "." or ".." segments; params look like :id', 'C14')
     return null
   }
   const names = segments.filter((s) => s.startsWith(':')).map((s) => s.slice(1))
 
   for (const option of Object.keys(def)) {
-    if (!OPTIONS.includes(option)) { const s = suggest(option); problem(`unknown option \`${option}\``, s ? `did you mean \`${s}\`?` : `options are ${OPTIONS.join(', ')}`) }
+    if (!OPTIONS.includes(option)) { const s = suggest(option); problem(`unknown option \`${option}\``, s ? `did you mean \`${s}\`?` : `options are ${OPTIONS.join(', ')}`, 'C12') }
   }
   const { auth, params, query, body, response, handler, load, owner, rateLimit } = def
-  if (!isAuthMode(auth)) problem('`auth` is missing or invalid', "auth: 'public' | 'optional' | 'user' | { permission: 'name' }")
-  else if (auth !== 'public' && !hasAuth) problem(`auth '${typeof auth === 'object' ? 'permission' : auth}' needs the app's auth`, 'pass auth: defineAuth({ from, resolve }) to createApp')
+  if (!isAuthMode(auth)) problem('`auth` is missing or invalid', "auth: 'public' | 'optional' | 'user' | { permission: 'name' }", 'C1')
+  else if (auth !== 'public' && !hasAuth) problem(`auth '${typeof auth === 'object' ? 'permission' : auth}' needs the app's auth`, 'pass auth: defineAuth({ from, resolve }) to createApp', 'C14')
   if (!fn(handler)) problem('`handler` must be a function', 'handler: (c) => value')
-  if (!(response instanceof Schema)) problem('`response` is missing', 'response: t.object({ ...fields the client may see }) or t.empty()')
-  if ((method === 'GET' || method === 'DELETE') && body !== undefined) problem(`${method} routes cannot have a \`body\``, 'move the fields to `query`, or use POST/PUT/PATCH')
+  if (!(response instanceof Schema)) problem('`response` is missing', 'response: t.object({ ...fields the client may see }) or t.empty()', 'C2')
+  if ((method === 'GET' || method === 'DELETE') && body !== undefined) problem(`${method} routes cannot have a \`body\``, 'move the fields to `query`, or use POST/PUT/PATCH', 'C5')
   if (params instanceof Schema && params.kind === 'object') {
     const declared = Object.keys(params.options['properties'] ?? {})
     if (declared.length !== names.length || !names.every((n) => declared.includes(n))) {
-      problem(`\`params\` (${declared.join(', ') || 'none'}) must match the path (${names.join(', ') || 'none'})`, `params: t.object({ ${names.map((n) => `${n}: t.id()`).join(', ')} })`)
+      problem(`\`params\` (${declared.join(', ') || 'none'}) must match the path (${names.join(', ') || 'none'})`, `params: t.object({ ${names.map((n) => `${n}: t.id()`).join(', ')} })`, 'C4')
     }
   }
   if (load !== undefined && !fn(load)) problem('`load` must be a function', 'load: (c) => db.things.get(c.params.id)')
   if (owner !== undefined && !fn(owner) && owner !== 'none' && owner !== 'query') problem('`owner` is invalid', "owner: (c, record) => boolean, 'none' or 'query'")
-  if (fn(owner) && !fn(load)) problem('an owner function needs `load`', 'add load: (c) => db.things.get(c.params.id)')
-  if (fn(owner) && auth === 'public') problem('an owner rule on a public route has no user to check', "use auth: 'user' or 'optional'")
+  if (fn(owner) && !fn(load)) problem('an owner function needs `load`', 'add load: (c) => db.things.get(c.params.id)', 'C6')
+  if (fn(owner) && auth === 'public') problem('an owner rule on a public route has no user to check', "use auth: 'user' or 'optional'", 'C6')
   if (names.length > 0 && auth !== 'public' && owner === undefined) {
     problem(`acts on a specific record (${names.map((n) => ':' + n).join(', ')}) but has no \`owner\` rule`,
-      "add load: (c) => db.things.get(c.params.id) and owner: (c, thing) => thing.ownerId === c.user.id; or owner: 'none' / 'query'")
+      "add load: (c) => db.things.get(c.params.id) and owner: (c, thing) => thing.ownerId === c.user.id; or owner: 'none' / 'query'", 'C6')
   }
   const compiled: { -readonly [K in keyof Compiled]?: Compiled[K] } = {}
   try {
@@ -159,7 +176,10 @@ function compileRoute(key: string, def: Definition, hasAuth: boolean, problems: 
     if (body !== undefined) compiled.body = compileValidator(body, 'body')
     if (rateLimit !== undefined) compiled.limiter = createLimiter(rateLimit as string)
     if (response instanceof Schema) compiled.serialize = compileSerializer(response)
-  } catch (e) { problem(e instanceof Error ? e.message : String(e), 'see SPEC sections 5 and 6') }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    problem(message, 'see SPEC sections 5 and 6', message.includes('.private()') ? 'C10' : undefined)
+  }
   if (fn(load)) compiled.load = load as NonNullable<Compiled['load']>
   if (fn(owner)) compiled.owner = owner as NonNullable<Compiled['owner']>
   if (problems.length > before) return null
@@ -208,17 +228,29 @@ function parseQuery(qs: string): Record<string, string> {
 
 const UNSAFE = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
-export function createApp(options: AppOptions): App {
-  const { auth, routes, limits = {}, log = (m: string) => console.error(m) } = options
-  const bodyLimit = limits.body ?? 1024 * 1024
-  const trusted = new Set(options.cors?.origins ?? [])
+// Every startup check, without starting anything: createApp throws on these, `pangol check` reports them.
+function compileApp(options: AppOptions) {
+  const { auth, routes } = options
   const router = new Router<Compiled>()
-  const problems: string[] = []
+  const problems: Problem[] = []
+  const cors = options.cors === undefined ? undefined
+    : compileCors(options.cors, auth !== undefined && auth.from !== 'bearer', { json: JSON_HEADERS, empty: SECURITY_HEADERS }, problems)
   for (const [key, def] of Object.entries(routes)) {
     const r = compileRoute(key, def as Definition, auth !== undefined, problems)
-    if (r !== null && !router.add(r.method, r.path, r.route)) problems.push(`✖ ${key}: the same method and path is defined twice\n    Fix: remove or rename one of them`)
+    if (r !== null && !router.add(r.method, r.path, r.route)) problems.push({ key, what: 'the same method and path is defined twice', fix: 'remove or rename one of them', rule: 'C14' })
   }
-  if (problems.length > 0) throw new Error(`pangol: ${problems.length} problem(s), the app was not started.\n${problems.join('\n')}`)
+  return { router, problems, cors }
+}
+
+/** The problems that would stop createApp(options), as data. */
+export const findProblems = (options: AppOptions): readonly Problem[] => compileApp(options).problems
+
+export function createApp(options: AppOptions): App {
+  const { auth, limits = {}, log = (m: string) => console.error(m) } = options
+  const bodyLimit = limits.body ?? 1024 * 1024
+  const { router, problems, cors } = compileApp(options)
+  if (problems.length > 0) throw new Error(`pangol: ${problems.length} problem(s), the app was not started.\n${problems.map(format).join('\n')}`)
+  const trusted = cors?.origins ?? new Set<string>()
 
   const fail = (route: Compiled, e: unknown): Out => {
     if (e instanceof ValidationError) return error(400, `${e.field} ${e.message}`, e.field)
@@ -319,25 +351,40 @@ export function createApp(options: AppOptions): App {
 
   // Steps 1-2 (strict path, routing), then the route's pipeline. `url` is the request-target as the
   // adapter received it: origin-form ("/a?b") from node:http, absolute-form from fetch runtimes.
-  const handle: Handle = (method, url, incoming) => {
+  const dispatch: Handle = (method, url, header, incoming) => {
     const path = pathFromUrl(url)
     if (path === null) return BAD_PATH
     const found = router.find(method, path)
     if (found === null) return NOT_FOUND
-    if ('allow' in found) return new Out(405, METHOD_NOT_ALLOWED, found.allow)
+    if ('allow' in found) {
+      if (cors !== undefined && method === 'OPTIONS' && header('access-control-request-method') !== null) {
+        const headers = cors.preflight(header('origin'), found.allow)
+        return headers === null ? CORS_BLOCKED : new Out(204, null, undefined, headers)
+      }
+      return new Out(405, METHOD_NOT_ALLOWED, found.allow)
+    }
     const q = url.indexOf('?')
     const query = q === -1 ? '' : url.slice(q + 1)
     return run(found.route, incoming(query === '' ? path : `${path}?${query}`, query), found.values)
+  }
+
+  const withCors = (origin: string | null) => (out: Out) =>
+    out.headers !== undefined || cors === undefined ? out : new Out(out.status, out.body, out.allow, cors.response(origin, out.body === null))
+  const handle: Handle = cors === undefined ? dispatch : (method, url, header, incoming) => {
+    const out = dispatch(method, url, header, incoming)
+    const decorate = withCors(header('origin'))
+    return isThenable(out) ? out.then(decorate) : decorate(out)
   }
 
   const app: App = {
     limits: Object.freeze({ body: bodyLimit }),
     fetch(request, info = {}) {
       const url = request.url
-      const out = handle(request.method, url, (target, query) => ({
+      const header = (name: string) => request.headers.get(name)
+      const out = handle(request.method, url, header, (target, query) => ({
         method: request.method, target, query,
         host: request.headers.get('host') ?? new URL(url).host, ip: info.ip ?? '',
-        headers: request.headers, header: (name) => request.headers.get(name), readBody: (limit) => readBody(request, limit),
+        headers: request.headers, header, readBody: (limit) => readBody(request, limit),
       }))
       return isThenable(out) ? out.then(toResponse) : Promise.resolve(toResponse(out))
     },
@@ -346,9 +393,10 @@ export function createApp(options: AppOptions): App {
   return app
 }
 
-export type Handle = (method: string, url: string, incoming: (target: string, query: string) => Incoming) => Out | Promise<Out>
+export type Handle = (method: string, url: string, header: (name: string) => string | null, incoming: (target: string, query: string) => Incoming) => Out | Promise<Out>
 const handlers = new WeakMap<App, Handle>()
 const BAD_PATH = error(400, 'invalid path')
+const CORS_BLOCKED = error(403, 'origin not allowed')
 const METHOD_NOT_ALLOWED = JSON.stringify({ error: 'method not allowed' })
 
 /** For adapters in this package: the app's request handler without the fetch Request/Response wrapping. */

@@ -108,6 +108,9 @@ my-api/
 - ไฟล์ที่ขึ้นต้นด้วย `_` ไม่ใช่ route; ไฟล์อื่นใน `routes/` ที่ชื่อผิดรูปแบบ = build error
 - Segment ตายตัวชนะ param (`posts/search.get.ts` ก่อน `posts/[id].get.ts`); method + path ซ้ำ = build error
 - ไม่มี `_config` ระดับโฟลเดอร์ การตั้งค่าที่ใช้ร่วมกันทำด้วย helper ธรรมดาที่คืน `route({...})` (เช่น `webhook({...})`)
+- ไฟล์ route ต้อง `export default route({...})`; ชื่อ segment ใช้ได้เฉพาะตัวอักษร ตัวเลข `-` `_` `~` และ `.` (ไม่ขึ้นต้น) หรือ `[param]` ที่ชื่อเป็น identifier และไม่ซ้ำใน path เดียวกัน; นามสกุล `.ts`, `.mts`, `.js`, `.mjs`; `*.d.ts` ถูกข้าม
+- `pangol build` เขียน `.pangol/routes.ts` เป็นตาราง import แบบ static (`export const routes = { 'GET /health': r0, ... }`) แอปส่งต่อให้ `createApp({ auth, routes })` จึงไม่มีการอ่านไฟล์ตอนรัน และ bundler เห็นทุก route; import ใช้ `.js` เว้นแต่ tsconfig เปิด `allowImportingTsExtensions` / `rewriteRelativeImportExtensions`
+- รัน TypeScript ตรงๆ: Bun ได้เลย; Node 22.18+ ใช้ `node --import pangol/register src/server.ts` (type stripping ของ Node + hook ที่แปลง import `./x.js` ที่ไม่มีไฟล์เป็น `./x.ts`) ข้อจำกัดของ Node: ห้ามใช้ syntax ที่ต้องแปลง (enum, namespace, parameter property)
 
 **`pangol.config.ts`**
 
@@ -298,7 +301,12 @@ Route ที่มี path param และไม่ใช่ `'public'` ต้�
 
 - `content-type`, `x-content-type-options: nosniff`, `x-frame-options: DENY`, `cache-control: no-store` ทุก response
 - Error เป็น `{ error, field? }` ไม่มี stack trace; 500 log รายละเอียดฝั่ง server เท่านั้น
-- CORS ปิดเป็นค่าเริ่มต้น เปิดด้วย origin ที่ระบุเท่านั้น
+- CORS ปิดเป็นค่าเริ่มต้น เปิดด้วย `cors: { origins, headers?, maxAge? }` เท่านั้น
+  - `origins` ต้องเป็น origin ตรงตัวตามที่ browser ส่ง (`https://app.example.com`: ตัวพิมพ์เล็ก ไม่มี path, `/` ท้าย, port ค่าเริ่มต้น หรือ `*`) ผิดรูป = app ไม่ start; ไม่มี wildcard
+  - origin ที่อยู่ในรายการได้ `Access-Control-Allow-Origin: <origin นั้น>` ทุก response รวม error (ให้ browser อ่าน `{ error }` ได้); origin อื่นไม่ได้ header CORS เลย; เมื่อเปิด CORS ทุก response มี `Vary: Origin`
+  - `Access-Control-Allow-Credentials: true` อัตโนมัติเมื่อ `defineAuth` อ่าน cookie และไม่มีเลยเมื่อเป็น bearer (ไม่มี option `credentials`)
+  - Preflight (`OPTIONS` ที่มี `Access-Control-Request-Method`): path ที่มีอยู่ = 204 พร้อม method ของ path นั้น, `authorization, content-type` + `headers` ที่ประกาศ และ `max-age` (ค่าเริ่มต้น 600 วินาที, ไม่เกิน 86,400); origin ที่ไม่อยู่ในรายการ = 403; path ไม่มี = 404; `OPTIONS` อื่นๆ = 405 เหมือนเดิม
+  - รายการเดียวกันนี้คือ origin ที่ cookie auth เชื่อถือสำหรับการเขียน (หัวข้อ 12)
 - Node: `requestTimeout` 10 s, `headersTimeout` 5 s
 
 **Upload (v0.2)**
@@ -337,9 +345,14 @@ Route ที่มี path param และไม่ใช่ `'public'` ต้�
 | C14 | ชื่อไฟล์ผิดรูปแบบ, route ซ้ำ, ไม่มี `auth.ts` ทั้งที่มี route ที่ไม่ใช่ public | error |
 | C15 | `runtime: 'workers'` แต่ import ไลบรารีที่ใช้บน edge ไม่ได้ หรือมี `onShutdown` | warning (เมื่อมี Workers adapter) |
 
-**ข้อจำกัด:** C3, C7, C8, C9 ตรวจจาก source ของ handler แบบ heuristic ใน PoC ใน v0.1 ต้องย้ายไปใช้ AST ของ TypeScript เพื่อไม่ให้หลบได้ด้วยการตั้งชื่อตัวแปรอื่น
+**การทำงาน (v0.1):** `pangol check` โหลดไฟล์ route ทุกไฟล์และ `src/auth.ts` จริง (ไม่ start server) แล้ว
+- C1, C2, C4, C5, C6, C10, C12, C14 (route ซ้ำ, ไม่มี auth) ใช้ตัวตรวจตัวเดียวกับที่ `createApp` ใช้ตอน start จึงไม่มีทางที่ check ผ่านแต่แอป start ไม่ได้ (หรือกลับกัน)
+- C3, C7, C8, C9, C13 อ่าน AST ของ TypeScript จาก source ของ handler ที่โหลดจริง (`Function.prototype.toString`) จึงครอบคลุม route ที่สร้างจาก helper และไม่หลบด้วยการเปลี่ยนชื่อ parameter, destructuring (`({ user }) =>`), alias (`const ctx = c`) หรือ `c['user']`
+- เมื่อ `c` หลุดไปที่ตามไม่ได้ (ส่งเข้า function อื่น, spread, เก็บใส่ตัวแปรภายหลัง, `c[ตัวแปร]`) กฎที่ต้องการคำตอบว่า "ไม่เคยอ่าน" (C7, C13) จะข้าม ส่วนกฎที่ต้องการคำตอบว่า "อ่าน" (C3, C9) และ C8 (`c.fail(403)` แบบตัวเลขตรงๆ) ยังทำงาน
+- `typescript` เป็น optional peer dependency ที่ CLI โหลดจากโปรเจกต์ของผู้ใช้; ตัว framework ตอนรันไม่ใช้
+- C11 ใช้กับ Standard Schema เท่านั้น (`t.object` ตัด key เกินเสมอ) จึงยังไม่มีผลจนกว่าจะรองรับ Standard Schema
 
-ผลเมื่อผ่าน: ตารางทุก route พร้อม auth และ owner ที่มีผลจริง รวมค่าที่มาจาก helper
+ผลเมื่อผ่าน: ตารางทุก route พร้อม auth และ owner ที่มีผลจริง รวมค่าที่มาจาก helper (`pangol routes`)
 
 ## 10. Security manifest และ diff
 
@@ -360,9 +373,24 @@ Manifest สรุปทุกสิ่งที่แต่ละ route เป�
 
 - CI ต้องสร้าง manifest ใหม่ทั้ง base และ head ทุกครั้ง ห้ามเชื่อไฟล์ manifest ที่ commit มา (คนแก้ route แก้ manifest ได้ด้วย)
 - GitHub Action ทางการ: `pangol diff origin/main..HEAD --format markdown` แล้วโพสต์เป็น comment เดียวที่อัปเดตทุก push
-- `--fail-on high` ใช้เป็น required check ได้ พร้อมทางยกเว้นด้วย label `security-reviewed`
+- `--fail-on high` (หรือ `medium`) ใช้เป็น required check ได้ พร้อมทางยกเว้นด้วย label `security-reviewed`
+- ตัวอย่าง workflow (ระหว่างที่ยังไม่มี Action ทางการ):
+
+```yaml
+- uses: actions/checkout@<sha>
+  with: { fetch-depth: 0 }
+- run: npm ci
+- run: npx pangol diff origin/${{ github.base_ref }} --format markdown --fail-on high > pangol-diff.md
+```
 
 **ข้อจำกัดที่ต้องบอกผู้ใช้:** กฎหลายข้ออิงชื่อ field และ heuristic เลี่ยงได้ด้วยการตั้งชื่อหลบ; 🟡 แปลว่า "ไปดูโค้ด" ไม่ใช่คำตัดสิน; ตรรกะธุรกิจใน handler ได้แค่ ℹ
+
+**การทำงาน (v0.1)**
+- `pangol check --manifest out.json` เขียน manifest (JSON, `"pangol": 1`): ต่อ route มี `file`, `auth`, `owner` (`kind`, `source`, `hash`, `usesUser`: true/false/`'unknown'`), `load` (`source`, `hash`), `params`/`query`/`body`/`response` เป็น field path → kind (`"items[].price": "money"`, `?` = optional หรือมี default), `responseIsList`, `usesUser`, `rateLimit`, `handler` (hash) และ `imports` (hash ของไฟล์ในโปรเจกต์ที่ route import ต่อกันไป ใช้แทน "hash ของไฟล์ helper"); ระดับแอปมี `auth.from` และ hash ของ `auth.ts` กับไฟล์ที่มัน import
+- `pangol diff <base>` เทียบ git revision กับ working tree, `diff <base>..<head>` เทียบสอง revision, `diff a.json b.json` เทียบสองไฟล์; revision ทุกตัวถูก checkout ลง git worktree ชั่วคราวแล้วโหลดใหม่ (ใช้ `node_modules` ที่ติดตั้งอยู่) ไม่อ่าน manifest ที่ commit ไว้
+- source และ hash มาจาก `Function.prototype.toString()` ของ function ที่โหลดจริง: เทียบ base กับ head บนรันไทม์เดียวกันเสมอ (Bun แปลงโค้ดก่อน source จึงต่างจาก Node)
+- กฎเพิ่ม: field ชื่อเหมือนเงิน (`price`, `total`, `fee`…) ที่เป็น `t.number`/`t.int` = 🔴 (หัวข้อ 18)
+- ชื่อ field อ่านเป็นคำ (`passwordHash` → password, hash) ไม่ใช่ substring: `hashtag`, `priceless` ไม่ติด
 
 ## 11. Typed client และ OpenAPI
 
@@ -423,7 +451,7 @@ await api.patch('/posts/:id', { params: { id }, body: { title: 'New' } })
 | `pangol serve [port]` | รัน build ที่ compile แล้ว | 0.1 |
 | `pangol diff a.json b.json` | เทียบ manifest สองไฟล์ | 0.1 |
 | `pangol diff main..HEAD` / `diff main` | เทียบ git ref หรือ ref กับ working tree | 0.1 |
-| `diff` options | `--fail-on high\|check`, `--json out.json`, `--format markdown\|text` | 0.1 |
+| `diff` options | `--fail-on high\|medium`, `--json out.json`, `--format markdown\|text` | 0.1 |
 | `pangol openapi` | OpenAPI 3.1 ออก stdout | 0.1 |
 | `pangol routes` | ตาราง route, auth, owner | 0.1 |
 | `pangol db pull --from postgres\|mysql\|sqlite\|prisma\|drizzle` | สร้าง `models.gen.ts` | 0.2 |
@@ -432,6 +460,8 @@ await api.patch('/posts/:id', { params: { id }, body: { title: 'New' } })
 | `pangol eject --to hono` | ถอดออก | 0.3 |
 
 Exit code: 0 ผ่าน · 1 มีปัญหา / เกินเกณฑ์ `--fail-on` · 2 ใช้คำสั่งผิด
+
+สถานะ: `check` (`--manifest`), `routes`, `build` (เขียน `.pangol/routes.ts`), `diff` (ไฟล์, revision, `a..b`; `--format`, `--json`, `--fail-on high|medium`) ใช้ได้แล้ว พร้อม option `--root`, `--routes`, `--auth`; ยังไม่มี `dev`, `serve`, `openapi` และ `npm create pangol`
 
 ## 14. เป้าหมายประสิทธิภาพ
 

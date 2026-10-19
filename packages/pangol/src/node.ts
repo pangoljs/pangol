@@ -4,7 +4,7 @@
 // SPEC section 8 is rejected, including dot-segments a fetch runtime would have normalized away.
 import { createServer as createHttpServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { Reject } from './core/strict.js'
-import { JSON_HEADERS, Out, SECURITY_HEADERS, handlerOf, type App, type Incoming } from './runtime/app.js'
+import { Out, handlerOf, headersOf, type App, type Incoming } from './runtime/app.js'
 
 export interface ServeOptions {
   /** 0 picks a free port. Default 3000. */
@@ -28,7 +28,7 @@ export function createServer(app: App): Server {
       readBody: (limit) => readBody(req, limit),
     })
     let out: Out | Promise<Out>
-    try { out = handle(req.method ?? '', req.url ?? '', incoming) } catch { out = INTERNAL }
+    try { out = handle(req.method ?? '', req.url ?? '', header, incoming) } catch { out = INTERNAL }
     if (out instanceof Out) send(req, res, out) // synchronous routes answer without a Promise
     else out.then((o) => send(req, res, o), () => send(req, res, INTERNAL))
   })
@@ -45,12 +45,10 @@ export function serve(app: App, options: ServeOptions = {}): Server {
 
 function send(req: IncomingMessage, res: ServerResponse, out: Out): void {
   if (res.headersSent || res.destroyed) return
-  let headers: Record<string, string> = out.body === null ? SECURITY_HEADERS : JSON_HEADERS
+  const headers = headersOf(out)
   // A body left unread (too large, or a route without one) would be read and discarded to keep the
   // connection alive; close it instead, so a client cannot make the server swallow a huge upload.
-  const close = !req.complete
-  if (out.allow !== undefined || close) headers = { ...headers, ...(out.allow !== undefined && { allow: out.allow }), ...(close && { connection: 'close' }) }
-  res.writeHead(out.status, headers)
+  res.writeHead(out.status, req.complete ? headers : { ...headers, connection: 'close' })
   res.end(out.body ?? undefined)
 }
 
