@@ -1,16 +1,30 @@
 import { defineAuth, route, t } from '../src/index.js'
 import type { Infer } from '../src/index.js'
 
-const auth = defineAuth({
-  resolve: async (_request: Request) => ({ id: 'u1', permissions: ['edit'], name: 'Ada' }),
-})
-declare module '../src/index.js' {
-  interface Register { auth: typeof auth }
-}
-
 // Exact equality catches accidental widening to unknown or any.
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false
 function exact<A, B>(_equal: Equal<A, B> extends true ? true : never): void {}
+
+const auth = defineAuth({
+  from: 'bearer',
+  resolve: async (request) => {
+    exact<typeof request.credential, string>(true)
+    exact<ReturnType<typeof request.cookies.get>, string | undefined>(true)
+    // @ts-expect-error the request is read-only
+    request.headers.set('x', 'y')
+    return { id: 'u1', permissions: ['edit'], name: 'Ada' }
+  },
+})
+defineAuth({ from: { cookie: 'session' }, resolve: () => null })
+// @ts-expect-error the credential source is required
+defineAuth({ resolve: () => null })
+// @ts-expect-error only bearer tokens and named cookies are supported
+defineAuth({ from: 'header', resolve: () => null })
+// @ts-expect-error resolve returns a user with id and permissions, or null
+defineAuth({ from: 'bearer', resolve: () => ({ id: 'u1' }) })
+declare module '../src/index.js' {
+  interface Register { auth: typeof auth }
+}
 
 const post = t.object({ id: t.id(), title: t.string(), published: t.bool() })
 route({

@@ -161,7 +161,7 @@ export default route({
 | ค่า | ใครเรียกได้ | `c.user` |
 | --- | --- | --- |
 | `'public'` | ทุกคน header Authorization ถูกเมิน | `null` เสมอ (อ่าน `c.user` = build error) |
-| `'optional'` | ทุกคน; ส่ง token มาต้องถูก มิฉะนั้น 401 | user หรือ `null` |
+| `'optional'` | ทุกคน; ส่ง credential มา (header `Authorization` หรือ cookie ที่ `from` ระบุ) ต้องถูก มิฉะนั้น 401 | user หรือ `null` |
 | `'user'` | คนที่ login (มิฉะนั้น 401) | user |
 | `{ permission: 'x' }` | user ที่มี permission (มิฉะนั้น 403); ชื่อว่างไม่ได้ | user |
 
@@ -373,7 +373,14 @@ await api.patch('/posts/:id', { params: { id }, body: { title: 'New' } })
 | Hono | `app.mount('/api/v2', pangol.fetch)` |  |
 | Express | `app.use('/api/v2', pangolExpress())` | ต้องเสียบ**ก่อน** `express.json()`; adapter ตรวจ `req._body === true` หรือ `req.readableEnded` แล้วโยน error พร้อมวิธีแก้; เสีย fast path ของ Node |
 
-**Auth ของระบบเดิม:** `defineAuth({ resolve(req) })` ได้ headers และ cookies ของ request ต้นฉบับ จึงเรียก `getSession()` ของ Auth.js, Lucia หรือ session เดิมได้ตรง คืน `{ id, permissions }` หรือ `null`; ใช้ cookie auth แล้วเปิด CSRF protection ให้อัตโนมัติ
+**Auth ของระบบเดิม:** `defineAuth({ from, resolve(req) })`
+- `from: 'bearer'` (header `Authorization: Bearer <token>`) หรือ `from: { cookie: 'session' }` framework อ่าน credential เอง จึงรู้ว่า request มี credential หรือไม่ (ใช้กับ `'optional'`) และไม่เรียก `resolve` เลยเมื่อไม่มี
+- `resolve(req)` ได้ `AuthRequest` แบบอ่านอย่างเดียว: `method`, `url`, `headers.get()`, `cookies.get()` และ `credential` ที่อ่านแล้ว adapter สร้างเองโดยไม่สร้าง `Request` (Node fast path) จึงเรียก `getSession()` ของ Auth.js, Lucia หรือ session เดิมได้ คืน `{ id, permissions }` หรือ `null` (sync หรือ async)
+- **CSRF อัตโนมัติเมื่อ `from` เป็น cookie:** request ที่มี cookie credential และ method ไม่ใช่ GET/HEAD/OPTIONS ต้องผ่านกฎนี้ มิฉะนั้น 403 (แนวเดียวกับ `CrossOriginProtection` ของ Go)
+  1. มี `Sec-Fetch-Site` → ผ่านเมื่อเป็น `same-origin` หรือ `none` หรือ `Origin` อยู่ใน `cors.origins`
+  2. ไม่มี `Sec-Fetch-Site` แต่มี `Origin` → ผ่านเมื่อ host ของ `Origin` ตรงกับ `Host` ของ request หรืออยู่ใน `cors.origins`
+  3. ไม่มีทั้งสอง → ผ่าน (ไม่ใช่ request จาก browser; browser ปัจจุบันส่งอย่างน้อยหนึ่งตัวกับ request ข้าม origin ที่เปลี่ยนข้อมูล)
+  - เอกสารแนะนำให้ตั้ง cookie เป็น `SameSite=Lax` หรือ `Strict` ด้วย
 
 **Services:** `defineServices({ onStart, onShutdown })` บน Node/Bun ดัก SIGTERM หยุดรับ connection ใหม่ ปิด keep-alive ที่ว่าง รอ request ที่ค้างไม่เกิน 25 s แล้วเรียก `onShutdown`; เมื่อเสียบเข้าแอปเดิม lifecycle เป็นของแอปเดิม
 
@@ -480,4 +487,4 @@ v0.1 เริ่มจาก type inference ของ `route()` ก่อน �
 - รันไทม์หลักของ v0.1: ตัดสินแล้ว เริ่ม Bun ก่อน โดย core ยังคง runtime-neutral; Node และ fetch adapter ตามมา
 - การตอบ 404 เมื่อไม่ผ่าน owner ควรเปิดให้เปลี่ยนเป็น 403 ต่อ route ได้หรือไม่
 - Idempotency อยู่ใน core หรือเป็น plugin: เสนอให้เป็น option `idempotent: true` ของ route() ตั้งแต่ v0.1 (สงวนชื่อไว้ก่อน ทำจริงทีหลังได้) เพื่อไม่ให้การเพิ่มภายหลังทำให้ API เดิมพัง ต้องตัดสินว่าเก็บ key ที่ไหน (memory/Redis/DB) และอายุของ key
-- `t.money` ส่งออกทาง JSON เป็น string ("12.50") หรือ integer หน่วยย่อย (1250) เป็นค่าเริ่มต้น
+- ~~`t.money` ส่งออกทาง JSON เป็น string หรือ integer~~ ตัดสินแล้ว: decimal string (`"12.50"`) ดู DECISIONS.md

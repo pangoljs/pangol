@@ -11,11 +11,13 @@
 | 2026-10-14 | Owner failure → 404 | Do not reveal that a record exists |
 | 2026-10-14 | Bun first for v0.1; keep core runtime-neutral | User chose Bun as the first implementation and validation target; Node and fetch adapters follow |
 | 2026-10-14 | Wording: "financial-grade ready", not "certified" | Certification depends on the whole system the user builds |
+| 2026-10-18 | `t.money` JSON wire format is a **decimal string** (`"12.50"`); inside the server it is integer minor units (bigint) | A JSON number would be read as a float by JS clients and loses precision past 2^53; matches SPEC section 6 |
+| 2026-10-18 | `defineAuth({ from, resolve(req) })`: `from` is `'bearer'` or `{ cookie }`; `resolve` gets a read-only `AuthRequest` (method, url, headers, cookies, credential), not a `Request` | The Node adapter never builds a `Request` (SPEC section 3); knowing the credential source lets the framework tell "no credential" from "bad credential" for `'optional'` and turn on CSRF protection for cookies |
+| 2026-10-18 | Cookie auth gets cross-origin protection on unsafe methods from `Sec-Fetch-Site` / `Origin` (SPEC section 12), no CSRF tokens | Stateless and needs nothing from the app; same approach as Go's `CrossOriginProtection` |
 | 2026-10-18 | Minimum Node.js is **22** (was 20); CI tests 22, 24 and 26 | Node 20 reached end of life on 2026-04-30 and gets no security fixes. Nothing is published yet, so raising the floor breaks no users |
 
 ## Open
 
 - Idempotency: core (`idempotent: true` on `route()`) or plugin? Where are keys stored, and for how long?
-- `t.money` JSON wire format: decimal string (`"12.50"`) or integer minor units (`1250`) by default?
 - Allow switching owner failure to 403 per route?
 - Domain (pangol.dev?) and trademark check.
