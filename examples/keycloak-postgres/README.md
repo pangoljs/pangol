@@ -82,7 +82,7 @@ docker compose down -v
 
 - [`src/token.ts`](src/token.ts): ตรวจลายเซ็น RS256 จาก JWKS ของ issuer ที่ตั้งไว้, issuer, audience, exp, iat, sub และชนิด access token ของ Keycloak (`typ: Bearer`) ปฏิเสธ ID token; รับ `posts:write` จาก `resource_access[pangol-api].roles` เท่านั้น ไม่รวม realm role หรือ role ของ client อื่น
 - [`src/auth.ts`](src/auth.ts): ใช้ `defineAuth.resolve` เชื่อมผลตรวจ token กับ local user; token ผิด/ขาด = 401, permission ขาด = 403
-- [`src/db.ts`](src/db.ts): identity คือคู่ `(issuer, subject)` ไม่ใช้ email/username เป็นกุญแจ ใช้ parameterized SQL, list กรอง owner และ UPDATE/DELETE มี owner predicate ซ้ำเพื่อไม่ให้การเขียนอาศัยแค่ผล load ก่อนหน้า
+- [`src/db.ts`](src/db.ts): identity คือคู่ `(issuer, subject)` ไม่ใช้ email/username เป็นกุญแจ; ผู้ใช้เดิมใช้ SELECT โดยไม่เขียนแถวซ้ำ ผู้ใช้ใหม่ใช้ INSERT ON CONFLICT DO NOTHING และอ่าน ID ของ request ที่สร้างสำเร็จเมื่อเกิดการชนกัน ใช้ parameterized SQL, list กรอง owner และ UPDATE/DELETE มี owner predicate ซ้ำเพื่อไม่ให้การเขียนอาศัยแค่ผล load ก่อนหน้า
 - [`src/routes`](src/routes): route ประกาศ schema/auth/owner อย่างชัดเจน; ownership ล้ม = 404; client เปลี่ยน owner ผ่าน body ไม่ได้
 - [`src/models.ts`](src/models.ts): `internalNote` เป็น private และ response ใช้ `Post.public()` ฟิลด์นี้จึงไม่ออกจาก API
 - [`scripts/migrate.ts`](scripts/migrate.ts): migration รุ่น 001 รันใน transaction และ advisory lock เรียกซ้ำได้; แยก migration ออกจากการเริ่ม server ไม่ใช่ migration framework เต็มรูปแบบ
@@ -125,7 +125,7 @@ TEST_DATABASE_URL=postgres://demo:demo-local-only@127.0.0.1:55432/pangol_demo np
 
 การทดสอบสร้าง schema ชั่วคราวใน DB แล้วลบทิ้ง ไม่ truncate ตารางแอป; ต้องมีสิทธิ์ CREATE SCHEMA ใช้ realm `pangol-test` และ service accounts เฉพาะ fixture สำหรับตรวจสิทธิ์ รวมทั้งจำลอง browser form login กับ realm `pangol-demo` เพื่อทดสอบ helper PKCE จริง ห้ามนำ client secret/บัญชี demo ไปใช้กับระบบจริง
 
-ครอบคลุม signature/issuer/audience/expiry/token kind, key rotation, role isolation, HTTP CRUD, owner/non-owner/missing-resource, list isolation, private-field filtering, mass assignment, SQL injection input, transaction rollback และ token file permissions เทสต์ไม่ข้ามหรือใช้ mock DB/provider ถ้าบริการจริงไม่พร้อม
+ครอบคลุม signature/issuer/audience/expiry/token kind, key rotation, identity lookup แบบไม่เขียนซ้ำและ first login พร้อมกัน 32 requests, role isolation, HTTP CRUD, owner/non-owner/missing-resource, list isolation, private-field filtering, mass assignment, SQL injection input, transaction rollback และ token file permissions เทสต์ไม่ข้ามหรือใช้ mock DB/provider ถ้าบริการจริงไม่พร้อม
 
 CI ของ repo รัน `pangol check` ผ่าน build ของตัวอย่าง และมี job `keycloak-postgres` เปิดบริการจริงเพื่อรัน integration tests; Unit JWT tests ใช้ JWKS server ในเครื่องและกุญแจที่สร้างใหม่
 
