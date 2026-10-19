@@ -478,6 +478,8 @@ Exit code: 0 ผ่าน · 1 มีปัญหา / เกินเกณฑ�
 | `tsc` client ที่ 2,000 route | ≤ 2 s | 0.77 s |
 | Strict parser overhead | ≤ 5% | Node \~0%, Bun −4 ถึง −5% |
 
+**ผลรอบแรก (2026-10-19, [`bench/`](../bench/README.md)):** ผ่าน p99 และ RAM ทุกตัว, `/health` บน Node 95% ของ node:http; ยังไม่ผ่าน `/health` บน Bun (80%), GET เทียบ Elysia (81%; ราว 90% เมื่อ Elysia ส่ง security header ชุดเดียวกัน), GET เทียบ Hono บน Node (1.04 เท่า กับ Hono ที่ validate ด้วยมือ) และ POST เทียบ Elysia (97%) ส่วนต่างหลักบน Bun คือ security header 3 ตัวและการอ่าน URL ดิบเพื่อ strict path check
+
 **วิธีวัด:** wrk (`-t1 -c64`), server และ load generator pin คนละ core, A/B สลับรอบ 5 ครั้งใช้ค่ามัธยฐาน, ทุก server ต้องผ่าน conformance test ก่อนวัด · เพิ่มใน v0.1: ทดสอบ multi-core (Node cluster / Bun `reusePort`) เทียบ Go ที่ใช้ทุก core และ workload ที่มีฐานข้อมูลจริง
 
 ## 15. การทดสอบและคุณภาพ

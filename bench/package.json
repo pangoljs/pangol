@@ -1,0 +1,16 @@
+{
+  "name": "pangol-bench",
+  "private": true,
+  "type": "module",
+  "description": "SPEC section 14 benchmark: pangol vs Hono and Elysia on the same runtime. Not part of the pnpm workspace.",
+  "scripts": {
+    "conform": "node conform.mjs",
+    "bench": "node bench.mjs"
+  },
+  "dependencies": {
+    "pangol": "link:../packages/pangol",
+    "@hono/node-server": "2.1.5",
+    "elysia": "1.4.30",
+    "hono": "4.13.13"
+  }
+}
