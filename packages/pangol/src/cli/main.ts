@@ -1,46 +1,83 @@
 #!/usr/bin/env node
 /// <reference types="node" />
 // The `pangol` command (SPEC section 13). Exit codes: 0 passed, 1 problems found, 2 wrong usage.
-import { realpathSync } from 'node:fs'
+import { readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type TS from 'typescript'
+import type { Manifest } from './manifest.js'
 import { canImportTypeScript, enableTypeScriptImports } from './load.js'
 
 const USAGE = `Usage: pangol <command> [options]
 
 Commands:
-  check     check every route in src/routes (SPEC section 9)
-  routes    check, then list each route with its auth and owner
-  build     check, then write .pangol/routes.ts for createApp({ routes })
+  check [--manifest <file>]   check every route in src/routes (SPEC section 9); write the manifest
+  routes                      check, then list each route with its auth and owner
+  build                       check, then write .pangol/routes.ts for createApp({ routes })
+  diff <base> [<head>]        security changes between two manifests (SPEC section 10):
+                                diff base.json head.json   two manifest files
+                                diff main                  git revision vs the working tree
+                                diff main..HEAD            two git revisions
 
 Options:
-  --root <dir>      project folder (default: current folder)
-  --routes <dir>    routes folder, relative to the root (default: src/routes)
-  --auth <file>     auth module, relative to the root (default: src/auth.ts if it exists)
+  --root <dir>                project folder (default: current folder)
+  --routes <dir>              routes folder, relative to the root (default: src/routes)
+  --auth <file>               auth module, relative to the root (default: src/auth.ts if it exists)
+  --format text|markdown      diff output (default: text)
+  --json <file>               also write the diff as JSON
+  --fail-on high|medium       exit 1 when the diff has changes at this level or above
   --help, --version`
 
 class UsageError extends Error {}
 
-interface Args { command: string; root: string; routes?: string; auth?: string }
+interface Args {
+  command: string
+  root: string
+  positional: string[]
+  routes?: string
+  auth?: string
+  manifest?: string
+  format: 'text' | 'markdown'
+  json?: string
+  failOn?: 'high' | 'medium'
+}
+
+const FLAGS: Readonly<Record<string, readonly string[]>> = {
+  check: ['--root', '--routes', '--auth', '--manifest'],
+  routes: ['--root', '--routes', '--auth'],
+  build: ['--root', '--routes', '--auth'],
+  diff: ['--root', '--routes', '--auth', '--format', '--json', '--fail-on'],
+}
 
 function parseArgs(argv: readonly string[]): Args | 'help' | 'version' {
   if (argv.includes('--help') || argv.includes('-h') || argv.length === 0) return 'help'
   if (argv.includes('--version')) return 'version'
   const [command = '', ...rest] = argv
-  if (!['check', 'routes', 'build'].includes(command)) throw new UsageError(`unknown command "${command}"`)
-  const args: Args = { command, root: process.cwd() }
+  const allowed = FLAGS[command]
+  if (allowed === undefined) throw new UsageError(`unknown command "${command}"`)
+  const args: Args = { command, root: process.cwd(), positional: [], format: 'text' }
   for (let i = 0; i < rest.length; i++) {
     const flag = rest[i] as string
-    const value = rest[i + 1]
-    if (!['--root', '--routes', '--auth'].includes(flag)) throw new UsageError(`unknown option "${flag}"`)
+    if (!flag.startsWith('--')) { args.positional.push(flag); continue }
+    const value = rest[++i]
+    if (!allowed.includes(flag)) throw new UsageError(`unknown option "${flag}" for ${command}`)
     if (value === undefined || value.startsWith('--')) throw new UsageError(`${flag} needs a value`)
     if (flag === '--root') args.root = resolve(value)
     else if (flag === '--routes') args.routes = value
-    else args.auth = value
-    i++
+    else if (flag === '--auth') args.auth = value
+    else if (flag === '--manifest') args.manifest = value
+    else if (flag === '--json') args.json = value
+    else if (flag === '--format') {
+      if (value !== 'text' && value !== 'markdown') throw new UsageError('--format is text or markdown')
+      args.format = value
+    } else {
+      if (value !== 'high' && value !== 'medium') throw new UsageError('--fail-on is high or medium')
+      args.failOn = value
+    }
   }
+  const expected = command === 'diff' ? [1, 2] : [0]
+  if (!expected.includes(args.positional.length)) throw new UsageError(command === 'diff' ? 'diff needs a base: a manifest file, a git revision, or base..head' : `${command} takes no arguments, got "${args.positional[0]}"`)
   return args
 }
 
@@ -82,7 +119,42 @@ export async function main(argv: readonly string[], out = (s: string) => console
   if (!canImportTypeScript()) err(`pangol: Node ${process.version} cannot import .ts files; use Node 22.18+ or Bun`)
   enableTypeScriptImports()
   const { check, formatFindings } = await import('./check.js')
-  const result = await check({ root: args.root, ts, ...(args.routes !== undefined && { routes: args.routes }), ...(args.auth !== undefined && { auth: args.auth }) })
+  const { buildManifest } = await import('./manifest.js')
+  const checkAt = (root: string) => check({ root, ts, ...(args.routes !== undefined && { routes: args.routes }), ...(args.auth !== undefined && { auth: args.auth }) })
+
+  if (args.command === 'diff') {
+    const { atRevision } = await import('./git.js')
+    const { diff, failed, formatDiff } = await import('./diff.js')
+    // A manifest of the project at `root`. Problems are reported, but the diff still shows what changed.
+    const manifestAt = async (root: string, label: string) => {
+      const result = await checkAt(root)
+      if (result.findings.length > 0) err(`pangol: ${label} has ${result.findings.length} check problem(s); run pangol check there\n`)
+      return buildManifest(ts, root, result)
+    }
+    const load = async (spec: string, label: string): Promise<Manifest> => {
+      if (spec.endsWith('.json')) return JSON.parse(readFileSync(resolve(spec), 'utf8')) as Manifest
+      return atRevision(args.root, spec, (root) => manifestAt(root, label))
+    }
+    const [first = '', second] = args.positional
+    let base: Manifest, head: Manifest
+    try {
+      if (second !== undefined) [base, head] = [await load(first, first), await load(second, second)]
+      else if (first.includes('..') && !first.endsWith('.json')) {
+        const [from = '', to = ''] = first.split('..')
+        ;[base, head] = [await load(from, from), await load(to || 'HEAD', to || 'HEAD')]
+      } else [base, head] = [await load(first, first), await manifestAt(args.root, 'the working tree')]
+    } catch (e) {
+      err(`pangol: ${e instanceof Error ? e.message : String(e)}`)
+      return 2
+    }
+    const changes = diff(base, head)
+    out(formatDiff(changes, args.format))
+    if (args.json !== undefined) writeFileSync(args.json, JSON.stringify(changes, null, 2) + '\n')
+    return failed(changes, args.failOn) ? 1 : 0
+  }
+
+  const result = await checkAt(args.root)
+  if (args.manifest !== undefined) writeFileSync(args.manifest, JSON.stringify(buildManifest(ts, args.root, result), null, 2) + '\n')
   if (result.findings.length > 0) {
     err(formatFindings(result.findings))
     err(`\n${result.findings.length} problem(s) in ${result.routes.length} route(s).`)

@@ -23,8 +23,10 @@ Pre-alpha: nothing is published and the API can still change. See the
   applies today, with the file and a fix), `pangol routes`, `pangol build` (writes `.pangol/routes.ts`).
   `node --import pangol/register` runs a TypeScript app on Node 22.18+; Bun runs it as is.
 
-Not yet: `pangol diff` and the security manifest, `pangol dev`/`serve`, `t.multipart`, the typed
-client and OpenAPI.
+- The security manifest (`pangol check --manifest m.json`) and `pangol diff main` (or `a..b`, or two
+  manifest files): changes sorted 🔴/🟡/✓/ℹ, `--format markdown` for a PR comment, `--fail-on high`.
+
+Not yet: `pangol dev`/`serve`/`openapi`, `npm create pangol`, `t.multipart`, the typed client.
 
 ## Project layout
 
@@ -43,6 +45,7 @@ src/
 ```sh
 npx pangol check     # rules of SPEC section 9, exit 1 with a fix for each problem
 npx pangol build     # check, then write .pangol/routes.ts (add .pangol/ to .gitignore)
+npx pangol diff main --format markdown --fail-on high   # security changes of this branch
 bun src/server.ts    # or: node --import pangol/register src/server.ts
 ```
 

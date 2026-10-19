@@ -373,9 +373,24 @@ Manifest สรุปทุกสิ่งที่แต่ละ route เป�
 
 - CI ต้องสร้าง manifest ใหม่ทั้ง base และ head ทุกครั้ง ห้ามเชื่อไฟล์ manifest ที่ commit มา (คนแก้ route แก้ manifest ได้ด้วย)
 - GitHub Action ทางการ: `pangol diff origin/main..HEAD --format markdown` แล้วโพสต์เป็น comment เดียวที่อัปเดตทุก push
-- `--fail-on high` ใช้เป็น required check ได้ พร้อมทางยกเว้นด้วย label `security-reviewed`
+- `--fail-on high` (หรือ `medium`) ใช้เป็น required check ได้ พร้อมทางยกเว้นด้วย label `security-reviewed`
+- ตัวอย่าง workflow (ระหว่างที่ยังไม่มี Action ทางการ):
+
+```yaml
+- uses: actions/checkout@<sha>
+  with: { fetch-depth: 0 }
+- run: npm ci
+- run: npx pangol diff origin/${{ github.base_ref }} --format markdown --fail-on high > pangol-diff.md
+```
 
 **ข้อจำกัดที่ต้องบอกผู้ใช้:** กฎหลายข้ออิงชื่อ field และ heuristic เลี่ยงได้ด้วยการตั้งชื่อหลบ; 🟡 แปลว่า "ไปดูโค้ด" ไม่ใช่คำตัดสิน; ตรรกะธุรกิจใน handler ได้แค่ ℹ
+
+**การทำงาน (v0.1)**
+- `pangol check --manifest out.json` เขียน manifest (JSON, `"pangol": 1`): ต่อ route มี `file`, `auth`, `owner` (`kind`, `source`, `hash`, `usesUser`: true/false/`'unknown'`), `load` (`source`, `hash`), `params`/`query`/`body`/`response` เป็น field path → kind (`"items[].price": "money"`, `?` = optional หรือมี default), `responseIsList`, `usesUser`, `rateLimit`, `handler` (hash) และ `imports` (hash ของไฟล์ในโปรเจกต์ที่ route import ต่อกันไป ใช้แทน "hash ของไฟล์ helper"); ระดับแอปมี `auth.from` และ hash ของ `auth.ts` กับไฟล์ที่มัน import
+- `pangol diff <base>` เทียบ git revision กับ working tree, `diff <base>..<head>` เทียบสอง revision, `diff a.json b.json` เทียบสองไฟล์; revision ทุกตัวถูก checkout ลง git worktree ชั่วคราวแล้วโหลดใหม่ (ใช้ `node_modules` ที่ติดตั้งอยู่) ไม่อ่าน manifest ที่ commit ไว้
+- source และ hash มาจาก `Function.prototype.toString()` ของ function ที่โหลดจริง: เทียบ base กับ head บนรันไทม์เดียวกันเสมอ (Bun แปลงโค้ดก่อน source จึงต่างจาก Node)
+- กฎเพิ่ม: field ชื่อเหมือนเงิน (`price`, `total`, `fee`…) ที่เป็น `t.number`/`t.int` = 🔴 (หัวข้อ 18)
+- ชื่อ field อ่านเป็นคำ (`passwordHash` → password, hash) ไม่ใช่ substring: `hashtag`, `priceless` ไม่ติด
 
 ## 11. Typed client และ OpenAPI
 
@@ -436,7 +451,7 @@ await api.patch('/posts/:id', { params: { id }, body: { title: 'New' } })
 | `pangol serve [port]` | รัน build ที่ compile แล้ว | 0.1 |
 | `pangol diff a.json b.json` | เทียบ manifest สองไฟล์ | 0.1 |
 | `pangol diff main..HEAD` / `diff main` | เทียบ git ref หรือ ref กับ working tree | 0.1 |
-| `diff` options | `--fail-on high\|check`, `--json out.json`, `--format markdown\|text` | 0.1 |
+| `diff` options | `--fail-on high\|medium`, `--json out.json`, `--format markdown\|text` | 0.1 |
 | `pangol openapi` | OpenAPI 3.1 ออก stdout | 0.1 |
 | `pangol routes` | ตาราง route, auth, owner | 0.1 |
 | `pangol db pull --from postgres\|mysql\|sqlite\|prisma\|drizzle` | สร้าง `models.gen.ts` | 0.2 |
@@ -446,7 +461,7 @@ await api.patch('/posts/:id', { params: { id }, body: { title: 'New' } })
 
 Exit code: 0 ผ่าน · 1 มีปัญหา / เกินเกณฑ์ `--fail-on` · 2 ใช้คำสั่งผิด
 
-สถานะ: `check`, `routes`, `build` (เขียน `.pangol/routes.ts`) ใช้ได้แล้ว พร้อม option `--root`, `--routes`, `--auth`
+สถานะ: `check` (`--manifest`), `routes`, `build` (เขียน `.pangol/routes.ts`), `diff` (ไฟล์, revision, `a..b`; `--format`, `--json`, `--fail-on high|medium`) ใช้ได้แล้ว พร้อม option `--root`, `--routes`, `--auth`; ยังไม่มี `dev`, `serve`, `openapi` และ `npm create pangol`
 
 ## 14. เป้าหมายประสิทธิภาพ
 

@@ -23,6 +23,7 @@
 | 2026-10-19 | `pangol check` loads the real route files and reuses createApp's startup checks; AST rules read `Function.prototype.toString()` of the loaded handler with the TypeScript parser. `typescript` is an optional peer dependency used only by the CLI | One checker for check and startup means they can never disagree; reading the loaded function covers routes built by helpers; the core keeps zero runtime dependencies |
 | 2026-10-19 | File routing produces a generated static table, `.pangol/routes.ts` (`pangol build`), passed to `createApp({ routes })`; no file system scan at run time | Works on every runtime and bundler, keeps startup cheap, and the table is visible code |
 | 2026-10-19 | `pangol/register` for running TypeScript on Node 22.18+ (type stripping + a `.js`→`.ts` resolve hook), no loader dependency | Node already strips types; only the `./x.js` import habit of TypeScript was missing |
+| 2026-10-19 | `pangol diff <ref>` rebuilds the base manifest in a temporary git worktree that reuses the installed `node_modules`; `--fail-on` takes `high` or `medium` (the SPEC's `check` level was replaced: `pangol check` already fails on its own) | A committed manifest can be edited by the same PR; a level name is clearer than overloading `check` |
 
 ## Open
 

@@ -102,9 +102,39 @@ export default route({ auth: 'user', params: t.object({ id: t.id() }), response:
     expect(r.err).toContain('Fix: add load:')
   })
 
+  it('check --manifest writes the security manifest', () => {
+    expect(pangol('check', '--manifest', 'manifest.json').code).toBe(0)
+    const manifest = JSON.parse(readFileSync(join(project, 'manifest.json'), 'utf8'))
+    expect(Object.keys(manifest.routes)).toEqual(['GET /health', 'GET /posts/:id'])
+    expect(manifest.routes['GET /posts/:id'].imports).toEqual({ 'src/models.ts': expect.any(String) })
+  })
+
+  it('diff against a git revision rebuilds the base from git, never from a committed manifest', () => {
+    const g = (...args: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...args], { cwd: project, stdio: 'pipe' })
+    write('.gitignore', 'node_modules\n.pangol\n')
+    g('init', '-q', '-b', 'main')
+    g('add', '-A')
+    g('commit', '-q', '-m', 'base')
+    expect(pangol('diff', 'main').out).toContain('No security-relevant changes.')
+    // the head drops the owner rule
+    write('src/routes/posts/[id].get.ts', readFileSync(join(project, 'src/routes/posts/[id].get.ts'), 'utf8')
+      .replace("  owner: (c, post) => post.authorId === c.user.id,\n", "  owner: 'none',\n"))
+    const r = pangol('diff', 'main', '--format', 'markdown', '--fail-on', 'high', '--json', 'diff.json')
+    expect(r.code).toBe(1)
+    expect(r.out).toContain("- **GET /posts/:id**: owner became 'none' (was a function)")
+    expect(JSON.parse(readFileSync(join(project, 'diff.json'), 'utf8'))[0]).toMatchObject({ level: 'high', route: 'GET /posts/:id' })
+    g('commit', '-q', '-am', 'head')
+    expect(pangol('diff', 'main~1..main', '--fail-on', 'high').code).toBe(1)
+    expect(pangol('diff', 'main~1..main').code).toBe(0) // no --fail-on: report only
+    expect(pangol('diff', 'nope').code).toBe(2)
+    expect(execFileSync('git', ['worktree', 'list'], { cwd: project, encoding: 'utf8' }).trim().split('\n')).toHaveLength(1) // cleaned up
+  })
+
   it('wrong usage exits 2', () => {
     expect(pangol('chek').code).toBe(2)
     expect(pangol('check', '--rootx', '.').code).toBe(2)
+    expect(pangol('diff').code).toBe(2)
+    expect(pangol('diff', 'main', '--fail-on', 'low').code).toBe(2)
     expect(pangol('--help').code).toBe(0)
   })
 })
