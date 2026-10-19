@@ -1,6 +1,6 @@
 // Bun adapter: `import { serve } from 'pangol/bun'`. Kept out of the main entry so the core stays
 // runtime-neutral; it only touches the global `Bun`, so pangol needs no Bun type package.
-import type { App } from './runtime/app.js'
+import { responderOf, type App } from './runtime/app.js'
 
 interface BunServer {
   readonly port: number
@@ -30,13 +30,15 @@ const HEADERS = { 'content-type': 'application/json', 'x-content-type-options': 
 export function serve(app: App, options: ServeOptions = {}): BunServer {
   const bun = (globalThis as { Bun?: BunRuntime }).Bun
   if (bun === undefined) throw new Error("pangol/bun needs the Bun runtime; on other runtimes use app.fetch with that runtime's server")
+  const respond = responderOf(app)
   return bun.serve({
     port: options.port ?? 3000,
     ...(options.hostname !== undefined && { hostname: options.hostname }),
     // The app enforces its own limit and answers 413 with the usual JSON and headers. Bun's limit is a
     // backstop 1 MiB above it: past that, Bun answers a bare 413 before the app sees the request.
     maxRequestBodySize: app.limits.body + 1024 * 1024,
-    fetch: (request, server) => app.fetch(request, { ip: server.requestIP(request)?.address ?? '' }),
+    // a synchronous route answers without a Promise; the client address is looked up only if read
+    fetch: (request, server) => respond(request, () => server.requestIP(request)?.address ?? ''),
     error: () => new Response(INTERNAL, { status: 500, headers: HEADERS }),
   })
 }

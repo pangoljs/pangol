@@ -22,6 +22,7 @@ describe.runIf(!onBun)('node:http adapter', () => {
       'GET /agent': route({ auth: 'public', response: t.string(), handler: (c) => c.headers.get('user-agent') ?? '' }),
       'POST /echo': route({ auth: 'public', body: t.object({ s: t.string() }), response: t.string(), handler: (c) => c.body.s }),
       'GET /boom': route({ auth: 'public', response: t.string(), handler: () => { throw new Error('boom') } }),
+      'GET /ip': route({ auth: 'public', response: t.string(), handler: (c) => c.ip }),
     },
   })
 
@@ -80,6 +81,10 @@ describe.runIf(!onBun)('node:http adapter', () => {
     const res = await raw(port, 'GET', '/health', { 'content-type': 'application/json', 'content-length': '5' }, 'hello')
     expect(res.status).toBe(200)
     expect(res.headers['connection']).toBe('close')
+  })
+
+  it('gives handlers the client address', async () => {
+    expect((await raw(port, 'GET', '/ip')).body).toMatch(/127\.0\.0\.1/)
   })
 
   it('a handler that throws is a 500 and the server keeps running', async () => {

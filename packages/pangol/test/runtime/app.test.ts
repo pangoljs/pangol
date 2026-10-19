@@ -111,6 +111,45 @@ describe('validation', () => {
     const big = JSON.stringify({ title: 'x'.repeat(1_100_000) })
     expect((await call('POST', '/posts', { token: 'tok-ada', body: big })).status).toBe(413)
   })
+  describe('reading the body within the limit', () => {
+    const small = createApp({
+      auth, limits: { body: 64 },
+      routes: { 'POST /posts': route({ auth: 'user', body: t.object({ title: t.string() }), response: t.string(), handler: (c) => c.body.title }) },
+    })
+    const post = (body: BodyInit, headers: Record<string, string> = {}) => small.fetch(new Request('http://api.test/posts', {
+      method: 'POST', body, headers: { authorization: 'Bearer tok-ada', 'content-type': 'application/json', ...headers }, duplex: 'half',
+    } as RequestInit))
+    const stream = (chunk: string, times: number, pulls = { n: 0 }) => new ReadableStream<Uint8Array>({
+      pull(controller) { if (pulls.n++ < times) controller.enqueue(new TextEncoder().encode(chunk)); else controller.close() },
+    })
+
+    it('with a declared content-length (the fast path)', async () => {
+      const res = await post('{"title":"hi"}', { 'content-length': '14' })
+      expect([res.status, await res.text()]).toEqual([200, '"hi"'])
+      expect((await post('{"title":"' + 'x'.repeat(100) + '"}', { 'content-length': '112' })).status).toBe(413) // refused before reading
+    })
+
+    it('without a length: a stream is cut as soon as it passes the limit', async () => {
+      const res = await post(stream('{"title":"hi"}', 1))
+      expect([res.status, await res.text()]).toEqual([200, '"hi"'])
+      const pulls = { n: 0 }
+      expect((await post(stream('x'.repeat(40), 1_000_000, pulls))).status).toBe(413)
+      expect(pulls.n).toBeLessThan(10) // stopped reading, did not drain a million chunks
+    })
+
+    it('a body longer than its declared length is still held to the limit', async () => {
+      expect((await post(stream('x'.repeat(40), 1_000, { n: 0 }), { 'content-length': '10' })).status).toBe(413)
+    })
+  })
+  it('each response has its own headers: a host changing one never changes the next', async () => {
+    // response headers are built once at startup and copied into each Response (fetch spec)
+    const first = await call('GET', '/health')
+    first.headers.set('set-cookie', 'session=leaked')
+    first.headers.delete('x-content-type-options')
+    const second = (await call('GET', '/health')).headers
+    expect(second.get('set-cookie')).toBeNull()
+    expect(second.get('x-content-type-options')).toBe('nosniff')
+  })
   it('parses the query strictly', async () => {
     expect((await call('GET', '/list?limit=5&tag=a+b')).json).toEqual({ limit: 5, tag: 'a b' })
     expect((await call('GET', '/list')).json).toEqual({ limit: 10 })
