@@ -1,51 +1,52 @@
 # pangol
 
-Pre-alpha. Not usable yet. See the [repository README](../../README.md) and [docs/SPEC.md](../../docs/SPEC.md).
+Pre-alpha: nothing is published and the API can still change. See the
+[repository README](../../README.md) and [docs/SPEC.md](../../docs/SPEC.md).
 
-v0.1 starts with Bun. This first slice exports schema and route **declarations**,
-not an HTTP server: validators, response serializers, ownership enforcement,
-compiler checks and adapters are still to come. Do not invoke a declared handler
-as a request endpoint.
+## What works today
 
-Implemented schema metadata: `t.string`, `t.id`, `t.int`, `t.number`, `t.bool`,
-`t.enum`, `t.array`, `t.object`, `t.empty`, `.optional()` and `.default()`.
-`route()` infers inputs, awaited non-null resources from `load`, and response types.
-`t.model` and `t.money` are not implemented yet; the money wire format remains open.
+- `route()` and `t` with full type inference (`c.params`, `c.query`, `c.body`, `c.user`, `c.resource`)
+- `createApp({ auth, routes })`: the request pipeline of SPEC section 3 —
+  strict path check, routing (404/405), auth (401/403, cookie CSRF protection), rate limit (429),
+  validation (400/413/415), `load` + `owner` (404), handler, response filtering (500 on mismatch)
+- Adapters: `app.fetch(request)` for any fetch runtime, and `serve(app)` from `pangol/bun`
+- Startup checks: an app with an unsafe or invalid route (missing `owner` on a record route,
+  `params` not matching the path, body on GET, unknown option…) refuses to start
 
-For custom auth fields, register the resolver's type once in the application:
+Not yet: file-based routing and the `pangol` CLI (`check`, `diff`, `build`), the Node adapter,
+CORS headers, `t.money`, `t.model`, `t.email`/`t.uuid`/`t.multipart`, the typed client and OpenAPI.
+
+## Example
 
 ```ts
-import { defineAuth, route, t } from 'pangol'
+import { createApp, defineAuth, route, t } from 'pangol'
+import { serve } from 'pangol/bun'
 
 export const auth = defineAuth({
-  resolve: async (_request: Request) => ({ id: 'u1', permissions: ['read'], name: 'Ada' }),
+  from: 'bearer', // or { cookie: 'session' }
+  resolve: async (req) => db.sessions.user(req.credential), // { id, permissions, ... } or null
 })
-
 declare module 'pangol' {
   interface Register { auth: typeof auth }
 }
 
-export default route({
-  auth: 'user',
-  response: t.object({ name: t.string() }),
-  handler: (c) => ({ name: c.user.name }),
+const Post = t.object({ id: t.id(), title: t.string({ max: 200 }) })
+
+const app = createApp({
+  auth,
+  routes: {
+    'GET /posts/:id': route({
+      auth: 'user',
+      params: t.object({ id: t.id() }),
+      load: (c) => db.posts.get(c.params.id),
+      owner: (c, post) => post.authorId === c.user.id, // not the owner -> 404
+      response: Post, // fields outside the schema never leave the server
+      handler: (c) => c.resource,
+    }),
+  },
 })
+
+serve(app, { port: 3000 })
 ```
 
-Without registration, authenticated users have `id` and `permissions`. Public
-contexts cannot read `user`; optional auth requires a null check. Undeclared body,
-query and resource fields are unavailable to handlers. Filesystem-dependent rules
-(such as requiring owner for `[id]` routes) need the future compiler.
-
 Checks: `pnpm typecheck`, `pnpm test`, `pnpm test:bun`, `pnpm build`.
-Run `bun dev` from this package (or the repository root) to watch `src/` and rebuild
-the library's JavaScript and declarations in `dist/`. Stop with Ctrl+C. This is a
-library build watcher; it does not start an HTTP server. The future `pangol dev`
-CLI will check routes and start the configured adapter.
-The Bun job runs the same Vitest tests under Bun 1.3.13; Node CI also remains enabled.
-
-Run `pnpm --filter pangol typeperf` for a reproducible server type benchmark
-(1 and 2,000 independent routes). Initial local baseline on Bun 1.3.13 / TypeScript
-5.9.3: 2,000 routes used 1,207,812 instantiations, 532,415 KB and 6.55 s check time
-(6.88 s total). These are server declarations, not the generated client or IDE
-autocomplete benchmark in SPEC section 14; those targets have not been measured.

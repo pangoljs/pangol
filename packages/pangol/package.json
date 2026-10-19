@@ -8,7 +8,10 @@
   "homepage": "https://github.com/pangoljs/pangol",
   "keywords": ["backend", "framework", "typescript", "security", "api", "ai"],
   "engines": { "node": ">=22" },
-  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./bun": { "types": "./dist/bun.d.ts", "default": "./dist/bun.js" }
+  },
   "files": ["dist"],
   "sideEffects": false,
   "scripts": {

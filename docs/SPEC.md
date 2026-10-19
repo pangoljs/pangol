@@ -48,6 +48,7 @@ pangol คือ backend framework บน TypeScript ที่ทำให้ท
   - Bun: `Bun.serve` + native `routes`, ตรวจค่า param ทุกตัวด้วย `safeSegment` (router ของ Bun decode param ให้แล้ว)
   - Node: `node:http` ตรง ไม่สร้าง `Request` object, dispatcher ที่ generate ไว้, ตรวจ request-target ดิบ
   - Fetch: `fetch(request)` มาตรฐาน สำหรับเสียบเข้า Next.js/Hono และรันไทม์อื่นในอนาคต
+    - ข้อจำกัด: URL ของ `Request` ถูก parse (WHATWG) และตัด dot-segment ไปแล้วก่อนถึงแอป (`/a/%2E%2E` มาถึงเป็น `/`) adapter นี้จึงปฏิเสธได้เฉพาะรูปแบบที่ยังเห็นได้ ส่วน Node adapter อ่าน request-target ดิบจึงปฏิเสธได้ครบตามหัวข้อ 8
 - **Tooling:** CLI (`check`, `diff`, `dev`, `build`), codegen ของ typed client และ OpenAPI
 
 **ลำดับต่อ request (คงที่ ทุก adapter ต้องตรงกัน)**
