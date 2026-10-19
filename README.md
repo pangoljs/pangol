@@ -7,9 +7,10 @@
   Common vulnerabilities become build errors. Every risky change shows up in the PR.
 </p>
 
-> **Status: pre-alpha.** Nothing is published yet. This repository currently holds the
-> [specification](docs/SPEC.md) and the [proof-of-concept experiments](poc/) that shaped it.
-> Work on v0.1 happens in [`packages/pangol`](packages/pangol).
+> **Status: alpha.** `npm install pangol@alpha` gives you 0.1.0-alpha: the request pipeline,
+> schemas (`t.model`, `t.money`), `pangol check` and `pangol diff`. The API can still change before
+> 0.1.0. See [what works today](packages/pangol#what-works-today), the [specification](docs/SPEC.md)
+> and the [proof-of-concept experiments](poc/) that shaped it.
 
 ## Why
 
@@ -47,6 +48,7 @@ export default route({
 | [`docs/DECISIONS.md`](docs/DECISIONS.md) | Decisions made and still open |
 | [`poc/`](poc/) | Five proof-of-concept experiments with results and honest limitations |
 | [`packages/pangol`](packages/pangol) | The framework (v0.1, in progress) |
+| [`bench/`](bench/) | wrk benchmark against Hono and Elysia (SPEC section 14) |
 | [`docs/brand/`](docs/brand/) | Logo and mascot assets |
 
 ## Proof-of-concept results (short)

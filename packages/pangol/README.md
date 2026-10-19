@@ -1,7 +1,14 @@
 # pangol
 
-Pre-alpha: nothing is published and the API can still change. See the
-[repository README](../../README.md) and [docs/SPEC.md](../../docs/SPEC.md).
+Alpha: the API can still change before 0.1.0. See the [repository README](../../README.md),
+[docs/SPEC.md](../../docs/SPEC.md) and the [changelog](CHANGELOG.md).
+
+```sh
+npm install pangol@alpha
+npm install -D typescript    # for the pangol CLI (check, diff); the framework itself has no dependencies
+```
+
+Node 22+ (22.18+ to run `.ts` files directly) or Bun.
 
 ## What works today
 

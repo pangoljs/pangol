@@ -2,7 +2,7 @@
  * pangol — v0.1 work starts here. See docs/SPEC.md for what goes in this package
  * (route, t, t.model, t.money, load/owner, compiler, adapters, check, manifest, diff).
  */
-export const version = '0.0.0'
+export const version = '0.1.0-alpha.0' // kept equal to package.json by test/smoke.test.ts
 export { t, Schema, Model } from './schema.js'
 export type { AnySchema, Infer, ObjectOutput, Shape } from './schema.js'
 export { money } from './money.js'

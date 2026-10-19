@@ -1,6 +1,6 @@
 {
   "name": "pangol",
-  "version": "0.0.0",
+  "version": "0.1.0-alpha.0",
   "description": "The TypeScript backend framework you can let AI write. Vulnerabilities become build errors.",
   "license": "MIT",
   "type": "module",
@@ -15,7 +15,7 @@
     "./register": { "types": "./dist/register.d.ts", "default": "./dist/register.js" }
   },
   "bin": { "pangol": "./dist/cli/main.js" },
-  "files": ["dist"],
+  "files": ["dist", "src", "CHANGELOG.md"],
   "sideEffects": ["./dist/register.js", "./dist/cli/main.js"],
   "scripts": {
     "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
@@ -23,8 +23,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:bun": "PANGOL_TEST_RUNTIME=bun bun --bun ./node_modules/vitest/vitest.mjs run",
-    "typeperf": "bun scripts/type-performance.mjs"
+    "typeperf": "bun scripts/type-performance.mjs",
+    "prepublishOnly": "npm run typecheck && npm run test && npm run build"
   },
+  "publishConfig": { "access": "public", "tag": "alpha" },
   "peerDependencies": { "typescript": ">=5.0" },
   "peerDependenciesMeta": { "typescript": { "optional": true } },
   "devDependencies": {
