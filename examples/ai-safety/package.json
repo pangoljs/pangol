@@ -10,5 +10,5 @@
     "test:bun": "bun test test/*.test.mjs"
   },
   "dependencies": { "pangol": "workspace:*" },
-  "devDependencies": { "typescript": "^5.9.3" }
+  "devDependencies": { "typescript": "^7.0.2" }
 }

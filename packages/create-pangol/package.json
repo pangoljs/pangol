@@ -17,5 +17,5 @@
     "prepublishOnly": "npm run typecheck && npm test"
   },
   "publishConfig": { "access": "public", "tag": "alpha" },
-  "devDependencies": { "@types/node": "^22.20.5", "typescript": "^5.9.3" }
+  "devDependencies": { "@types/node": "^26.6.5", "typescript": "^7.0.2" }
 }
