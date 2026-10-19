@@ -36,7 +36,7 @@ export interface App {
 
 // ---------------------------------------------------------------- responses
 
-class Out {
+export class Out {
   constructor(readonly status: number, readonly body: string | null, readonly allow?: string) {}
 }
 const error = (status: number, message: string, field?: string) =>
@@ -47,8 +47,8 @@ const FORBIDDEN = error(403, 'forbidden')
 const INTERNAL = error(500, 'internal error')
 const NO_CONTENT = new Out(204, null)
 
-const SECURITY_HEADERS = { 'x-content-type-options': 'nosniff', 'x-frame-options': 'DENY', 'cache-control': 'no-store' }
-const JSON_HEADERS = { ...SECURITY_HEADERS, 'content-type': 'application/json' }
+export const SECURITY_HEADERS = { 'x-content-type-options': 'nosniff', 'x-frame-options': 'DENY', 'cache-control': 'no-store' }
+export const JSON_HEADERS = { ...SECURITY_HEADERS, 'content-type': 'application/json' }
 function toResponse(out: Out): Response {
   const headers = out.body === null ? SECURITY_HEADERS : out.allow === undefined ? JSON_HEADERS : { ...JSON_HEADERS, allow: out.allow }
   return new Response(out.body, { status: out.status, headers })
@@ -170,7 +170,8 @@ function compileRoute(key: string, def: Definition, hasAuth: boolean, problems: 
 
 // ---------------------------------------------------------------- the request
 
-interface Incoming {
+/** One request as an adapter describes it. `headers` may be built lazily (only when a handler reads c.headers). */
+export interface Incoming {
   readonly method: string
   readonly target: string
   readonly query: string
@@ -294,7 +295,7 @@ export function createApp(options: AppOptions): App {
     })
     const c: Context = {
       params: route.params ? route.params(raw) : raw, query: undefined, body: undefined, resource: undefined,
-      user, ip: req.ip, headers: req.headers, ...helpers,
+      user, ip: req.ip, get headers() { return req.headers }, ...helpers,
     }
     if (route.query) c.query = route.query(parseQuery(req.query))
     if (route.body === undefined) return afterInput(route, c)
@@ -316,26 +317,45 @@ export function createApp(options: AppOptions): App {
     }
   }
 
-  return {
+  // Steps 1-2 (strict path, routing), then the route's pipeline. `url` is the request-target as the
+  // adapter received it: origin-form ("/a?b") from node:http, absolute-form from fetch runtimes.
+  const handle: Handle = (method, url, incoming) => {
+    const path = pathFromUrl(url)
+    if (path === null) return BAD_PATH
+    const found = router.find(method, path)
+    if (found === null) return NOT_FOUND
+    if ('allow' in found) return new Out(405, METHOD_NOT_ALLOWED, found.allow)
+    const q = url.indexOf('?')
+    const query = q === -1 ? '' : url.slice(q + 1)
+    return run(found.route, incoming(query === '' ? path : `${path}?${query}`, query), found.values)
+  }
+
+  const app: App = {
     limits: Object.freeze({ body: bodyLimit }),
     fetch(request, info = {}) {
       const url = request.url
-      const path = pathFromUrl(url)
-      if (path === null) return Promise.resolve(toResponse(error(400, 'invalid path')))
-      const found = router.find(request.method, path)
-      if (found === null) return Promise.resolve(toResponse(NOT_FOUND))
-      if ('allow' in found) return Promise.resolve(toResponse(new Out(405, JSON.stringify({ error: 'method not allowed' }), found.allow)))
-      const q = url.indexOf('?')
-      const query = q === -1 ? '' : url.slice(q + 1)
-      const req: Incoming = {
-        method: request.method, target: query === '' ? path : `${path}?${query}`, query,
+      const out = handle(request.method, url, (target, query) => ({
+        method: request.method, target, query,
         host: request.headers.get('host') ?? new URL(url).host, ip: info.ip ?? '',
         headers: request.headers, header: (name) => request.headers.get(name), readBody: (limit) => readBody(request, limit),
-      }
-      const out = run(found.route, req, found.values)
+      }))
       return isThenable(out) ? out.then(toResponse) : Promise.resolve(toResponse(out))
     },
   }
+  handlers.set(app, handle)
+  return app
+}
+
+export type Handle = (method: string, url: string, incoming: (target: string, query: string) => Incoming) => Out | Promise<Out>
+const handlers = new WeakMap<App, Handle>()
+const BAD_PATH = error(400, 'invalid path')
+const METHOD_NOT_ALLOWED = JSON.stringify({ error: 'method not allowed' })
+
+/** For adapters in this package: the app's request handler without the fetch Request/Response wrapping. */
+export function handlerOf(app: App): Handle {
+  const handle = handlers.get(app)
+  if (handle === undefined) throw new TypeError('expected an app from createApp()')
+  return handle
 }
 
 async function readBody(request: Request, limit: number): Promise<Uint8Array> {
