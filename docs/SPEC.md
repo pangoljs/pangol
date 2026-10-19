@@ -533,6 +533,8 @@ Exit code: 0 ผ่าน · 1 มีปัญหา / เกินเกณฑ�
 - **ทำเรื่องเดียวด้วยวิธีเดียว** API นิ่ง ถ้าต้อง breaking ต้องมี codemod
 - **MCP server ของเอกสาร** และการ expose route เป็น MCP tool แบบ opt-in อยู่ใน v0.3
 
+**หลักฐานที่รันได้ (2026-10-19):** [`examples/ai-safety`](../examples/ai-safety/README.md) สาธิตกฎ check/build และ runtime ที่มีอยู่ พร้อมกรณี public ที่ผิดเจตนาธุรกิจแต่ตรวจผ่าน ไม่เพิ่มกฎใหม่และไม่ใช่ผลประเมินโมเดล AI หรือ security audit; tests ตรวจทั้งโค้ดที่ถูกและสำเนาที่ตั้งใจแก้ให้ผิด
+
 ## 17. Roadmap
 
 ```mermaid
