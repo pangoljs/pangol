@@ -1,0 +1,14 @@
+{
+  "name": "@pangol/example-ai-safety",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "pangol check",
+    "typecheck": "pangol check",
+    "build": "pangol build",
+    "test": "node --test test/*.test.mjs",
+    "test:bun": "bun test test/*.test.mjs"
+  },
+  "dependencies": { "pangol": "workspace:*" },
+  "devDependencies": { "typescript": "^5.9.3" }
+}

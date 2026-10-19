@@ -57,6 +57,10 @@ export default route({
 
 [Keycloak + PostgreSQL](examples/keycloak-postgres/README.md): a runnable Node backend with browser login via PKCE, verified access tokens, owner-scoped CRUD, SQL transactions, and integration tests against real services. Includes local Docker Compose and instructions for adapting an existing Keycloak realm.
 
+## Safety when coding with AI
+
+[Executable safety examples](examples/ai-safety/README.md) show missing declarations rejected by `pangol check`, runtime auth/owner/input/output checks, and a deliberately public route that passes checks despite the wrong business intent. Includes runnable tests and explicit limits; these are demonstrations, not an AI-model evaluation or security audit.
+
 ## Proof-of-concept results (short)
 
 | PoC | Question | Result |
