@@ -28,6 +28,8 @@
 | 2026-10-19 | `create-pangol` versions independently; the template pins the tested `pangol` version | User chose independent releases; generator fixes need not release the framework |
 | 2026-10-19 | OpenAPI: 201 is read from the handler's AST (`c.created`), no `status` option on `route()`; input schemas leave `additionalProperties` open (undeclared input is dropped, not refused); what JSON Schema cannot express goes into `x-pangol-*` extensions | Keeps `route()` unchanged and the document truthful: a client reading it must not believe the server refuses what it accepts, or accepts what it refuses |
 
+| 2026-10-19 | Defer pangol + HTMX / HTML responses to the final future-work section of SPEC; prioritize backend readiness first | User requested recording the direction now, without implementing a frontend layer or choosing its API |
+
 ## Open
 
 - Idempotency: core (`idempotent: true` on `route()`) or plugin? Where are keys stored, and for how long?

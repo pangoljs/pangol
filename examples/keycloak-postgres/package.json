@@ -1,0 +1,28 @@
+{
+  "name": "@pangol/example-keycloak-postgres",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "check": "pangol check",
+    "build": "pangol build && tsc --noEmit",
+    "typecheck": "npm run build",
+    "test": "node --import pangol/register --test test/auth.test.ts",
+    "test:integration": "npm run build && node --env-file-if-exists=.env --import pangol/register --test test/integration*.test.ts",
+    "migrate": "node --env-file-if-exists=.env --import pangol/register scripts/migrate.ts",
+    "start": "node --env-file-if-exists=.env --import pangol/register src/server.ts",
+    "login": "node --env-file-if-exists=.env scripts/login.mjs"
+  },
+  "dependencies": {
+    "pangol": "workspace:*",
+    "jose": "6.2.12",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/pg": "^8.15.6",
+    "typescript": "^5.9.3"
+  }
+}

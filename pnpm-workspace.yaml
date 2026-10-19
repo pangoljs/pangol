@@ -1,5 +1,6 @@
 packages:
   - packages/*
+  - examples/*
 overrides:
   # 4.64.6 was too new for the local minimum-release-age policy when bootstrapping.
   rollup: 4.64.5

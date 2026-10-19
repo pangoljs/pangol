@@ -6,9 +6,9 @@
   "engines": { "node": ">=22" },
   "scripts": {
     "dev": "pnpm --filter pangol dev",
-    "test": "pnpm -r test",
+    "test": "pnpm --filter pangol build && pnpm -r test",
     "test:bun": "pnpm -r test:bun",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm --filter pangol build && pnpm -r typecheck",
     "build": "pnpm -r build"
   }
 }

@@ -42,3 +42,26 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+  keycloak-postgres:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter pangol build
+      - run: docker compose -f examples/keycloak-postgres/compose.yaml up -d
+      - run: node examples/keycloak-postgres/scripts/wait-for-keycloak.mjs
+      - run: pnpm --filter @pangol/example-keycloak-postgres test:integration
+        env:
+          TEST_DATABASE_URL: postgres://demo:demo-local-only@127.0.0.1:55432/pangol_demo
+      - if: failure()
+        run: docker compose -f examples/keycloak-postgres/compose.yaml logs --tail 100
+      - if: always()
+        run: docker compose -f examples/keycloak-postgres/compose.yaml down -v

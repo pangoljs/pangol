@@ -7,7 +7,7 @@
 
 ## 1. สถานะตอนนี้
 
-**ใช้ได้และมีเทสต์ (260 เทสต์บน Node, 250 บน Bun)**
+**ใช้ได้และมีเทสต์ (จำนวนเทสต์ให้ดูผล CI ล่าสุด; ตารางนี้เป็นสถานะ implementation)**
 
 | ส่วน | ไฟล์หลัก |
 |---|---|
@@ -18,12 +18,12 @@
 | Strict parser (path, content-type, JSON, **multipart**), CVE + fuzz test | `src/core/strict.ts`, `test/security/` |
 | Auth bearer/cookie + CSRF, CORS | `src/auth.ts`, `src/runtime/{credentials,cors}.ts` |
 | Adapter: fetch, Bun, Node (+ conformance test เทียบทุก adapter) | `src/{bun,node}.ts`, `test/conformance.test.ts` |
-| CLI: `check`, `routes`, `build`, `diff`, manifest | `src/cli/*` |
+| CLI: `check`, `routes`, `build`, `openapi`, `diff`, manifest | `src/cli/*` |
 | `pangol/register` (รัน .ts บน Node 22.18+) | `src/register.ts`, `src/cli/load.ts` |
 | Benchmark เทียบ Hono/Elysia | `bench/` (ผลใน `bench/README.md`) |
 
 **Release:** `release.yml` stage แพ็กเกจบน npm เมื่อ push tag `v*` แล้วเจ้าของกดอนุมัติด้วย 2FA (`npm stage approve`) ดูวิธีใน `release.yml`
-(branch `ci/staged-publishing` ยังรอ merge ณ วันที่เขียน)
+workflow อยู่ใน main แล้ว; การมี workflow ไม่ยืนยันว่าแพ็กเกจหรือรุ่นล่าสุดถูก publish แล้ว
 
 **ข้อจำกัดที่รู้แล้ว**
 - Bun และ fetch normalize dot-segment ใน URL ก่อนถึงแอป (SPEC 3) มีแค่ Node adapter ที่ปฏิเสธได้ครบ
@@ -140,11 +140,29 @@
 
 **ถามก่อนเริ่ม:** ถ้าเร็วขึ้นได้ด้วยการยอมให้ Bun normalize path มากขึ้น (เหมือนที่ยอมเรื่อง dot-segment ไปแล้ว) ยอมได้แค่ไหน?
 
-## 4. ลำดับที่แนะนำ
+## 4. ลำดับที่แนะนำ: ทำ backend ให้ใช้จริงก่อน HTML
 
-1. OpenAPI → 2. Typed client (ใช้ JSON Schema/โครงเดียวกัน) → 3. `t.multipart` → 4. `dev`/`serve` + `defineConfig` → 5. `npm create pangol` (ต้องมี dev/serve ก่อน template จะสมบูรณ์) → 6. Bun benchmark (ทำขนานได้ทุกเมื่อ)
+ตรวจจาก source บน main วันที่ 2026-10-19 หลัง PR #17; เป็นการตรวจ implementation และ workflow ไม่ใช่ production load test หรือการยืนยันสถานะ npm/Keycloak ของผู้ใช้ รายการด้านล่างเป็นข้อเสนอจัดลำดับ ไม่ได้ตัดสินคำถามเปิดของแต่ละงานแทนเจ้าของ
 
-แต่ละข้อเป็น branch และ PR ของตัวเอง; ปิดท้ายด้วย `0.1.0-alpha.N` ผ่าน `release.yml`
+**ตัวอย่างที่เพิ่ม:** [`examples/keycloak-postgres`](../examples/keycloak-postgres/README.md) มี Node backend, local Compose, PKCE login helper และ unit/integration tests สำหรับ Keycloak/PostgreSQL; ยังต้องทดสอบกับ realm/role ขององค์กรจริง และไม่ได้ปิดงาน lifecycle/config/proxy ของ framework
+
+**พร้อมทดลอง:** route/auth/owner, JSON validation/filtering, Node/Bun/fetch, CORS/CSRF, strict parser, security diff และ OpenAPI มีโค้ดและเทสต์แล้ว ตัวอย่าง starter ยังใช้ Map และ auth ที่ปฏิเสธทุก credential ไม่ใช่แอปที่ต่อ DB/login จริง
+
+| ลำดับ | งานและหลักฐานปัจจุบัน | ผลที่ต้องได้ก่อนถือว่าพร้อม |
+|---|---|---|
+| 1 | **แอปตัวอย่าง Keycloak + PostgreSQL**: [ตัวอย่างพร้อมทดลอง](../examples/keycloak-postgres/README.md) มี token verifier/DB จริงและเทสต์ local services แล้ว; core ยังคงมีเพียง `defineAuth.resolve` | เทสต์ local ครอบคลุม credential, claims, rotation, permissions, CRUD, transaction และ owner/list isolation แล้ว; งานต่อไปคือยืนยัน realm/role mapping และนโยบาย token ขององค์กรจริง |
+| 2 | **Lifecycle และการ deploy**: [`node.ts`](../packages/pangol/src/node.ts), [`bun.ts`](../packages/pangol/src/bun.ts) คืน server handle แต่ยังไม่มี `defineServices`/SIGTERM orchestration ตาม SPEC 12 | Startup ล้มเมื่อ config/DB ไม่พร้อม; แยก liveness/readiness; หยุดรับงานใหม่ รอ request และปิด DB pool ตาม deadline พร้อมเทสต์ทั้ง Node/Bun; ระหว่างนี้แอปจัดการ lifecycle เองได้ |
+| 3 | **`defineConfig`, `dev/serve` และขอบเขตการ mount**: [`main.ts`](../packages/pangol/src/cli/main.ts), [`build.ts`](../packages/pangol/src/cli/build.ts) ยังสร้างเพียง static route table; [`index.ts`](../packages/pangol/src/index.ts) ยังไม่ export config/services/Express adapter | กำหนด entry ของแอปและ lifecycle owner ก่อน; dev เห็น route เพิ่ม/ลบ, build ผิดไม่แทน server เดิม; serve ใช้ artifact ที่ทดสอบแล้ว; ยืนยัน basePath/mount ด้วย integration tests ก่อนประกาศรองรับ |
+| 4 | **พฤติกรรมหลัง reverse proxy และการวิเคราะห์ปัญหา**: Node ใช้ socket IP, Bun ใช้ requestIP; [`app.ts`](../packages/pangol/src/runtime/app.ts) ใช้ IP + user ID เป็น rate-limit key และมี log สำหรับ 500 | กำหนดขอบเขต proxy ที่เชื่อถือและทดสอบ forwarded headers ปลอม; แสดงผลต่อ anonymous rate limit หลัง proxy; ตัวอย่าง request ID/access log ที่ไม่บันทึก credential และตั้ง timeout ของ DB/provider แยกจาก HTTP timeout |
+| 5 | **ปิดช่องว่าง v0.1 ตามงานจริง**: ยังไม่มี typed client export และ `t.multipart`/`t.file` ใน schema แม้ strict multipart parser มีแล้ว | ทำ upload ก่อนถ้าแอปต้องรับไฟล์; typed client ช่วย frontend แต่ยังใช้ fetch ได้; ตรวจ OpenAPI กับ validator ตามหัวข้อ 3.1 และแก้ข้อจำกัดที่พบจากแอปตัวอย่าง |
+| 6 | **ตรวจสิ่งที่อ้างก่อน release**: [CI](../.github/workflows/ci.yml) และ [release](../.github/workflows/release.yml) รัน typecheck/tests/build แต่ยังไม่ได้ครอบคลุมทุก gate ใน SPEC 15 | ทำรายการ gate ที่ยังขาด เช่น nightly fuzz, benchmark/type performance ใน release และชุด diff แยก; แยกผลทดลองใน PoC ออกจากสิ่งที่ CI ปัจจุบันบังคับจริง และทดสอบ tarball/คำสั่งเริ่มแอปของรุ่นที่จะเผยแพร่ |
+| ท้ายสุด | **pangol + HTMX / HTML** — SPEC 19 | ออกแบบแยกหลัง backend ใช้งานจริงลงตัว ยังไม่เริ่ม implementation |
+
+**ขอบเขตแอปกับ framework:** ตัวเชื่อม Keycloak และ PostgreSQL เริ่มในตัวอย่าง/แพ็กเกจแยก ใช้ไลบรารีที่เหมาะสมได้โดยไม่เพิ่ม runtime dependency ใน core; ไม่จำเป็นต้องสร้าง ORM หรือระบบ login เอง การเก็บ session แบบ cookie หรือ bearer, การ map role และรูปแบบ user/tenant ต้องตกลงกับเจ้าของแอปก่อน ส่วน trusted proxy และ lifecycle API ต้องออกแบบใน SPEC ก่อนเปลี่ยน framework
+
+**ข้อจำกัดที่ต้องวางแผนเมื่อขยายระบบ:** rate limiter เป็น memory ต่อ process ไม่แชร์หลาย instance; อย่าถือว่า `node:http.requestTimeout` เป็น deadline ของ handler/DB; การมี auth และ owner ของ route รายตัวไม่แทนการกรองสิทธิ์ใน query รายการหรือ transaction ของแอป
+
+งาน backend ตามตารางเป็นลำดับแนะนำสำหรับแอปของผู้ใช้ ไม่ยกเลิกเป้าหมาย v0.1 เดิมหรือคำถามก่อนเริ่มในหัวข้อ 3 แต่ละ implementation เป็น branch/PR ของตัวเอง และตรวจ version ของแพ็กเกจจริงก่อนเผยแพร่
 
 ## 5. คำถามที่ยังเปิดจาก DECISIONS.md
 

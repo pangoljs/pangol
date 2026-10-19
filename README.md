@@ -53,6 +53,10 @@ export default route({
 | [`bench/`](bench/) | wrk benchmark against Hono and Elysia (SPEC section 14) |
 | [`docs/brand/`](docs/brand/) | Logo and mascot assets |
 
+## Backend example
+
+[Keycloak + PostgreSQL](examples/keycloak-postgres/README.md): a runnable Node backend with browser login via PKCE, verified access tokens, owner-scoped CRUD, SQL transactions, and integration tests against real services. Includes local Docker Compose and instructions for adapting an existing Keycloak realm.
+
 ## Proof-of-concept results (short)
 
 | PoC | Question | Result |

@@ -1,0 +1,92 @@
+{
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "roles": {
+    "client": {
+      "pangol-api": [
+        {
+          "name": "posts:write"
+        }
+      ]
+    }
+  },
+  "clients": [
+    {
+      "clientId": "pangol-api",
+      "enabled": true,
+      "bearerOnly": true,
+      "protocol": "openid-connect"
+    },
+    {
+      "clientId": "pangol-cli",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "http://127.0.0.1:8787/callback"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocolMappers": [
+        {
+          "name": "api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "pangol-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "realm": "pangol-demo",
+  "users": [
+    {
+      "username": "alice",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "alice",
+      "lastName": "Demo",
+      "email": "alice@example.test",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo-local-only",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "pangol-api": [
+          "posts:write"
+        ]
+      }
+    },
+    {
+      "username": "bob",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "bob",
+      "lastName": "Demo",
+      "email": "bob@example.test",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo-local-only",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "pangol-api": [
+          "posts:write"
+        ]
+      }
+    }
+  ]
+}
