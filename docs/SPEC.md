@@ -235,7 +235,11 @@ User.pick('name').partial()       // สำหรับ PATCH
 User.omit('role')
 ```
 
-- Field ที่เป็น `.private()` ห้ามอยู่ใน `response` (pick ตรงๆ = build error) และถูกปิดใน log อัตโนมัติ (v0.2)
+- `t.model` คือ `t.object` ที่มี helper: validate และ serialize เหมือนกันทุกอย่าง ใช้เป็น field หรือใน `t.array` ได้ และ helper ทุกตัวคืน model ใหม่ (ต่อกันได้ เช่น `pick(...).partial()`)
+- `pick` / `omit` เรียงตามลำดับใน model, ต้องระบุอย่างน้อยหนึ่ง field, ชื่อที่ไม่มีใน model = type error (และ TypeError ตอนประกาศสำหรับ JavaScript)
+- `partial()` ทำทุก field เป็น optional **และตัด `.default()` ทิ้ง** เพราะ field ที่ไม่ส่งมาใน PATCH แปลว่า "ไม่เปลี่ยน" ไม่ใช่ "ใส่ค่าเริ่มต้น"
+- `public()` ตัดทุก field ที่เป็นหรือ**มี** `.private()` อยู่ข้างใน (เช่น `lead: User` หรือ `t.array(User)`) ทิ้งทั้ง field ถ้าต้องการส่วนที่เหลือให้ใช้ `lead: User.public()`
+- Field ที่เป็น `.private()` ห้ามอยู่ใน `response` ไม่ว่าลึกแค่ไหน (ใน object, array, หลัง `.optional()`): type error ที่ `route()` และ app ไม่ยอม start (C10) ส่วนขาเข้า (`body`, `query`) ใช้ได้ และถูกปิดใน log อัตโนมัติ (v0.2)
 - `pangol db pull --from postgres|mysql|sqlite|prisma|drizzle` สร้าง `models.gen.ts` และตั้งชื่อคอลัมน์ `password*`, `*token*`, `*secret*`, `*hash*` เป็น private ให้อัตโนมัติ (v0.2)
 
 **แหล่งความจริงของ model (ล็อกไว้ตั้งแต่ v0.1)**

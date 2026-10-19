@@ -1,8 +1,12 @@
 import { checkScale, toMinor } from './money.js'
 
-/** Declarative schema metadata. Validation/serialization belongs to the compiler. */
-export class Schema<T> {
+/**
+ * Declarative schema metadata. Validation/serialization belongs to the compiler.
+ * `P` is true when the schema is or contains a `.private()` field, which a response may never hold.
+ */
+export class Schema<T, P extends boolean = false> {
   declare readonly output: T
+  declare readonly isPrivate: P
 
   constructor(
     readonly kind: string,
@@ -12,15 +16,23 @@ export class Schema<T> {
     Object.freeze(this)
   }
 
-  optional(): Schema<T | undefined> {
+  optional(): Schema<T | undefined, P> {
     return new Schema(this.kind, { ...this.options, optional: true })
   }
 
   /** The value is copied and deep-frozen, so requests can never share mutable default state. */
-  default(value: Exclude<T, undefined>): Schema<Exclude<T, undefined>> {
+  default(value: Exclude<T, undefined>): Schema<Exclude<T, undefined>, P> {
     return new Schema(this.kind, { ...this.options, optional: false, default: deepFreeze(structuredClone(value)) })
   }
+
+  /** Never sent to a client: a response that includes this field is a type error and a startup error. */
+  private(): Schema<T, true> {
+    return new Schema(this.kind, { ...this.options, private: true })
+  }
 }
+
+/** Any schema, private or not. */
+export type AnySchema = Schema<unknown, boolean>
 
 function deepFreeze<V>(value: V): V {
   if (typeof value === 'object' && value !== null && !Object.isFrozen(value)) {
@@ -89,8 +101,9 @@ function moneyOptions(options: MoneyOptions) {
 
 const MAX_EMAIL = 254 // RFC 5321 path limit
 
-export type Infer<S extends Schema<unknown>> = S['output']
-type Shape = Readonly<Record<string, Schema<unknown>>>
+export type Infer<S extends AnySchema> = S['output']
+export type Shape = Readonly<Record<string, AnySchema>>
+type PrivateIn<S extends Shape> = true extends S[keyof S]['isPrivate'] ? true : false
 type OptionalKeys<S extends Shape> = {
   [K in keyof S]: undefined extends Infer<S[K]> ? K : never
 }[keyof S]
@@ -126,9 +139,68 @@ export const t = Object.freeze({
   bool: (): Schema<boolean> => new Schema('bool'),
   enum: <const V extends readonly [string, ...string[]]>(values: V): Schema<V[number]> =>
     new Schema('enum', { values: Object.freeze([...values]) }),
-  array: <S extends Schema<unknown>>(item: S, options: ArrayOptions = {}): Schema<Infer<S>[]> =>
+  array: <S extends AnySchema>(item: S, options: ArrayOptions = {}): Schema<Infer<S>[], S['isPrivate']> =>
     new Schema('array', { ...bounds('array', options, isLength, LENGTH, 1_000), item }),
-  object: <const S extends Shape>(properties: S): Schema<ObjectOutput<S>> =>
+  object: <const S extends Shape>(properties: S): Schema<ObjectOutput<S>, PrivateIn<S>> =>
     new Schema('object', { properties: Object.freeze({ ...properties }), additionalProperties: false }),
+  /** An entity declared once; routes take the parts they need with pick, omit, partial and public. */
+  model: <const S extends Shape>(properties: S): Model<S> => new Model(properties),
   empty: (): Schema<undefined> => new Schema('empty'),
 })
+
+function containsPrivate(schema: AnySchema): boolean {
+  const o = schema.options
+  if (o['private'] === true) return true
+  if (o['item'] instanceof Schema) return containsPrivate(o['item'])
+  const properties = o['properties']
+  return typeof properties === 'object' && properties !== null && Object.values(properties).some(containsPrivate)
+}
+
+type Partial<S extends Shape> = { readonly [K in keyof S]: Schema<Infer<S[K]> | undefined, S[K]['isPrivate']> }
+type Public<S extends Shape> = { readonly [K in keyof S as S[K]['isPrivate'] extends false ? K : never]: S[K] }
+
+/** An object schema with helpers to derive other object schemas. It validates and serializes as t.object. */
+export class Model<S extends Shape> extends Schema<ObjectOutput<S>, PrivateIn<S>> {
+  constructor(properties: S) {
+    // `out[name] = value` on a plain object would set its prototype instead of a field
+    if (Object.hasOwn(properties, '__proto__')) throw new TypeError('t.model: a field cannot be named "__proto__"')
+    super('object', { properties: Object.freeze({ ...properties }), additionalProperties: false })
+  }
+
+  get shape(): S {
+    return this.options['properties'] as S
+  }
+
+  /** Only these fields, in the order the model declares them. */
+  pick<const K extends keyof S & string>(...keys: [K, ...K[]]): Model<Pick<S, K>> {
+    const wanted = this.known('pick', keys)
+    return new Model(this.fields((name) => wanted.has(name)) as Pick<S, K>)
+  }
+
+  omit<const K extends keyof S & string>(...keys: [K, ...K[]]): Model<Omit<S, K>> {
+    const unwanted = this.known('omit', keys)
+    return new Model(this.fields((name) => !unwanted.has(name)) as Omit<S, K>)
+  }
+
+  /** Every field optional and without its default: an absent field in a PATCH means "unchanged". */
+  partial(): Model<Partial<S>> {
+    return new Model(Object.fromEntries(Object.entries(this.shape).map(([name, s]) => [name, s.optional()])) as Partial<S>)
+  }
+
+  /** Every field that neither is nor contains a `.private()` field. */
+  public(): Model<Public<S>> {
+    return new Model(this.fields((_, s) => !containsPrivate(s)) as Public<S>)
+  }
+
+  private fields(keep: (name: string, schema: AnySchema) => boolean): Shape {
+    return Object.fromEntries(Object.entries(this.shape).filter(([name, s]) => keep(name, s)))
+  }
+
+  private known(method: string, keys: readonly string[]): Set<string> {
+    if (keys.length === 0) throw new TypeError(`Model.${method}: name at least one field`)
+    for (const key of keys) {
+      if (!Object.hasOwn(this.shape, key)) throw new TypeError(`Model.${method}: the model has no field "${key}" (fields: ${Object.keys(this.shape).join(', ')})`)
+    }
+    return new Set(keys)
+  }
+}

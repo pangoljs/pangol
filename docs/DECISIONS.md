@@ -18,6 +18,7 @@
 | 2026-10-19 | `t.money` has `min: "0"` unless declared; bounds are decimal strings | A negative transfer amount is a classic way to move money the wrong way; allowing negatives should be a visible choice in the route. String bounds keep floats out of declarations too |
 | 2026-10-19 | `money` helpers take a required rounding mode named as in `Intl.NumberFormat` (`halfEven`, `halfExpand`, …); `mul` takes a decimal string factor | No hidden default rounding; the names are a web standard; a float factor would bring back the error `t.money` removes |
 | 2026-10-19 | `t.uuid()` accepts lowercase only; `t.email()` follows the WHATWG `<input type="email">` rule and is not lowercased | One spelling per id (no "A…" vs "a…" duplicates); parsers reject instead of normalizing (SPEC section 8) |
+| 2026-10-19 | `.private()` is checked on responses only (type error + startup check); input may contain private fields. `Model.public()` drops any field that is or contains a private field; `partial()` drops defaults | A body may legitimately carry a secret (a password); a response never may. Dropping the containing field keeps the runtime and the type in agreement. A PATCH default would overwrite stored data |
 
 ## Open
 

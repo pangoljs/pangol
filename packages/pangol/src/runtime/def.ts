@@ -2,7 +2,7 @@
 // loose `options` record happens once here, so the compilers never cast.
 import { Schema } from '../schema.js'
 
-interface Modifiers { readonly optional: boolean; readonly hasDefault: boolean; readonly default?: unknown }
+interface Modifiers { readonly optional: boolean; readonly hasDefault: boolean; readonly default?: unknown; readonly private: boolean }
 interface Bounded { readonly min?: number; readonly max?: number }
 
 export type SchemaDef = Modifiers & (
@@ -29,7 +29,7 @@ export function toDef(schema: unknown): SchemaDef {
   if (!(schema instanceof Schema)) throw new TypeError('expected a schema built with t (e.g. t.object({...}))')
   const o = schema.options
   const hasDefault = Object.hasOwn(o, 'default') && o['optional'] !== true
-  const modifiers: Modifiers = { optional: o['optional'] === true, hasDefault, ...(hasDefault && { default: o['default'] }) }
+  const modifiers: Modifiers = { optional: o['optional'] === true, private: o['private'] === true, hasDefault, ...(hasDefault && { default: o['default'] }) }
   switch (schema.kind) {
     case 'string': {
       const pattern = o['pattern']

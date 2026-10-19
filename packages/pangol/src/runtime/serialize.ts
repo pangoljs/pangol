@@ -13,6 +13,8 @@ type Write = (value: unknown) => string
 const fail = (path: string, message: string): never => { throw new ResponseError(path, message) }
 
 function compile(def: SchemaDef, path: string): Write {
+  // SPEC C10: checked once at startup, so no request can ever reach a private field
+  if (def.private) throw new TypeError(`${path} is .private() and can never be sent: use Model.public() or .omit(...) for the response`)
   switch (def.kind) {
     case 'string': case 'id': case 'uuid': case 'email':
       return (v) => (typeof v === 'string' ? JSON.stringify(v) : fail(path, 'must be a string'))

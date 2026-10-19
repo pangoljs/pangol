@@ -167,3 +167,42 @@ t.money({ min: 0 })
 money.mul(100n, 0.07, 'halfEven')
 // @ts-expect-error the rounding mode is required
 money.div(100n, 3n)
+
+// t.model and .private(): a private field anywhere in a response is a type error (SPEC C10)
+// ObjectOutput stays an intersection (flattening it costs ~8% more instantiations at 2,000 routes)
+type Out<S extends { output: unknown }> = { [K in keyof S['output']]: S['output'][K] }
+const User = t.model({
+  id: t.id(),
+  name: t.string(),
+  email: t.email(),
+  role: t.enum(['admin', 'member']).default('member'),
+  passwordHash: t.string().private(),
+})
+exact<Out<typeof User>, { id: string; name: string; email: string; role: 'admin' | 'member'; passwordHash: string }>(true)
+exact<Out<ReturnType<typeof User.public>>, { id: string; name: string; email: string; role: 'admin' | 'member' }>(true)
+const patch = User.pick('name', 'role').partial()
+exact<Out<typeof patch>, { name?: string; role?: 'admin' | 'member' }>(true)
+exact<Out<ReturnType<typeof User.omit<'passwordHash' | 'role'>>>, { id: string; name: string; email: string }>(true)
+const Team = t.model({ id: t.id(), lead: User, members: t.array(User), profile: t.object({ bio: t.string() }) })
+exact<keyof Infer<ReturnType<typeof Team.public>>, 'id' | 'profile'>(true)
+declare const row: { id: string; name: string; email: string; role: 'admin' | 'member'; passwordHash: string }
+route({ auth: 'public', response: User.public(), handler: () => row })
+route({ auth: 'public', response: t.array(User.omit('passwordHash')), handler: () => [row] })
+route({ auth: 'user', body: User.pick('name', 'email'), response: User.public(), handler: (c) => ({ ...row, ...c.body }) })
+route({ auth: 'user', body: User.pick('passwordHash'), response: t.empty(), handler: (c) => c.noContent() })
+// @ts-expect-error the whole model has a private field
+route({ auth: 'public', response: User, handler: () => row })
+// @ts-expect-error picking a private field into a response
+route({ auth: 'public', response: User.pick('name', 'passwordHash'), handler: () => row })
+// @ts-expect-error private fields are found when nested
+route({ auth: 'public', response: t.object({ user: User }), handler: () => ({ user: row }) })
+// @ts-expect-error and inside arrays
+route({ auth: 'public', response: t.array(User), handler: () => [row] })
+// @ts-expect-error .optional() and .default() keep the private mark
+route({ auth: 'public', response: t.object({ token: t.string().private().optional() }), handler: () => ({}) })
+// @ts-expect-error the same rule applies to routes with load
+route({ auth: 'user', params: t.object({ id: t.id() }), load: () => row, owner: 'none', response: User, handler: (c) => c.resource })
+// @ts-expect-error pick only takes keys of the model
+User.pick('nmae')
+// @ts-expect-error omit too
+User.omit('passwrodHash')
